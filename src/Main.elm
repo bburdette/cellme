@@ -12,6 +12,10 @@ import Element.Border as Border
 import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
+import EvalStep exposing (NameSpace, Term(..))
+import Prelude exposing (BuiltInFn)
+import Run exposing (compile, runCount)
+import Show exposing (showTerm, showTerms)
 import Toop as T
 
 
@@ -30,6 +34,33 @@ initelts =
         , Array.fromList [ "2", "5", "6" ]
         , Array.fromList [ "9", "0", "0" ]
         ]
+
+
+sheetlang =
+    Prelude.prelude
+        |> Dict.union Prelude.math
+        |> Dict.insert "cellVal"
+            (TBuiltIn (Prelude.evalArgsBuiltIn cellVal))
+
+
+cellVal : BuiltInFn (Array (Array String))
+cellVal ns vals args =
+    case args of
+        [ TNumber x, TNumber y ] ->
+            let
+                xi =
+                    round x
+
+                yi =
+                    round y
+            in
+            Array.get yi vals
+                |> Maybe.andThen (Array.get xi)
+                |> Maybe.map (\s -> Ok ( ns, TString s ))
+                |> Maybe.withDefault (Err <| "cell not found: " ++ String.fromInt xi ++ ", " ++ String.fromInt yi)
+
+        _ ->
+            Err (String.concat ("setColor args should be 3 numbers!  " :: List.map showTerm args))
 
 
 eview : Model -> Element Msg
