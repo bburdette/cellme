@@ -1,5 +1,6 @@
-module Main exposing (Model, elts, eview, view)
+module Main exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
 
+import Array exposing (Array)
 import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
@@ -16,37 +17,50 @@ import Toop as T
 
 type Msg
     = Noop
+    | CellVal Int Int String
 
 
 type alias Model =
-    { elts : List (T.T3 String String String) }
+    { elts : Array (Array String) }
 
 
-elts =
-    [ T.T3 "1" "3" "4"
-    , T.T3 "2" "5" "6"
-    , T.T3 "9" "0" "0"
-    ]
+initelts =
+    Array.fromList
+        [ Array.fromList [ "1", "7", "8" ]
+        , Array.fromList [ "2", "5", "6" ]
+        , Array.fromList [ "9", "0", "0" ]
+        ]
 
 
 eview : Model -> Element Msg
 eview model =
+    let
+        colf =
+            \colidx ->
+                { header = text (String.fromInt colidx)
+                , width = fill
+                , view =
+                    \rowidx array ->
+                        Array.get colidx array
+                            |> Maybe.map
+                                (viewCell colidx rowidx)
+                            |> Maybe.withDefault (text "err")
+                }
+    in
     indexedTable [ width fill, height fill ]
-        { data = elts
+        { data = Array.toList model.elts
         , columns =
-            [ { header = text "1"
-              , width = fill
-              , view = \i (T.T3 a b c) -> row [ BD.color <| rgb 1 0 0 ] [ el [ centerX ] <| text a ]
-              }
-            , { header = text "2"
-              , width = fillPortion 2
-              , view = \i (T.T3 a b c) -> row [ BD.color <| rgb 0 1 0 ] [ el [ centerX ] <| text b ]
-              }
-            , { header = text "3"
-              , width = fill
-              , view = \i (T.T3 a b c) -> row [ BD.color <| rgb 0 0 1 ] [ el [ centerX ] <| text c ]
-              }
-            ]
+            List.map colf (List.range 0 (Array.length model.elts - 1))
+        }
+
+
+viewCell : Int -> Int -> String -> Element Msg
+viewCell xi yi val =
+    EI.text [ width fill ]
+        { onChange = \v -> CellVal xi yi v
+        , text = val
+        , placeholder = Nothing
+        , label = EI.labelHidden ("cell" ++ String.fromInt xi ++ "," ++ String.fromInt yi)
         }
 
 
@@ -61,12 +75,32 @@ view model =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        Noop ->
+            ( model, Cmd.none )
+
+        CellVal xi yi val ->
+            let
+                _ =
+                    Debug.log "CellVal" ( xi, yi, val )
+            in
+            ( { model
+                | elts =
+                    Array.get yi model.elts
+                        |> Maybe.map
+                            (\rowarray ->
+                                Debug.log "elts:" <|
+                                    Array.set yi (Array.set xi val rowarray) model.elts
+                            )
+                        |> Maybe.withDefault model.elts
+              }
+            , Cmd.none
+            )
 
 
 main =
     Browser.document
-        { init = \() -> ( { elts = elts }, Cmd.none )
+        { init = \() -> ( { elts = initelts }, Cmd.none )
         , subscriptions = \_ -> Sub.none
         , view = view
         , update = update
