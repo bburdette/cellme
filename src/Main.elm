@@ -5,6 +5,7 @@ import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
 import Browser.Navigation as BN
+import Cellme exposing (..)
 import Dict exposing (Dict)
 import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
 import Element.Background as BD
@@ -28,20 +29,13 @@ type alias Model =
     { elts : Array (Array Cell) }
 
 
-type alias Cell =
-    { code : String
-    , prog : Result String (List (Term ()))
-    , result : Result String (Term ())
-    }
-
-
 initelts =
     Array.map
         (Array.map
             (\s ->
                 { code = s
                 , prog = Err ""
-                , result = Err ""
+                , runstate = RsErr ""
                 }
             )
         )
@@ -51,33 +45,6 @@ initelts =
             , Array.fromList [ "2", "5", "6" ]
             , Array.fromList [ "9", "0", "0" ]
             ]
-
-
-sheetlang =
-    Prelude.prelude
-        |> Dict.union Prelude.math
-        |> Dict.insert "cellVal"
-            (TBuiltIn (Prelude.evalArgsBuiltIn cellVal))
-
-
-cellVal : BuiltInFn (Array (Array String))
-cellVal ns vals args =
-    case args of
-        [ TNumber x, TNumber y ] ->
-            let
-                xi =
-                    round x
-
-                yi =
-                    round y
-            in
-            Array.get yi vals
-                |> Maybe.andThen (Array.get xi)
-                |> Maybe.map (\s -> Ok ( ns, TString s ))
-                |> Maybe.withDefault (Err <| "cell not found: " ++ String.fromInt xi ++ ", " ++ String.fromInt yi)
-
-        _ ->
-            Err (String.concat ("setColor args should be 3 numbers!  " :: List.map showTerm args))
 
 
 eview : Model -> Element Msg
@@ -113,12 +80,15 @@ viewCell xi yi cell =
             }
         , el [ width fill ] <|
             E.text
-                (case cell.result of
-                    Ok term ->
+                (case cell.runstate of
+                    RsOk term ->
                         showTerm term
 
-                    Err s ->
+                    RsErr s ->
                         "err: " ++ s
+
+                    RsRunning _ ->
+                        "blocked I guess"
                 )
         ]
 
@@ -139,7 +109,7 @@ view model =
 
 defCell : String -> Cell
 defCell s =
-    { code = s, prog = Err "", result = Err "" }
+    { code = s, prog = Err "", runstate = RsErr "" }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
