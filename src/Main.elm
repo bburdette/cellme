@@ -25,15 +25,32 @@ type Msg
 
 
 type alias Model =
-    { elts : Array (Array String) }
+    { elts : Array (Array Cell) }
+
+
+type alias Cell =
+    { code : String
+    , prog : Result String (List (Term ()))
+    , result : Result String (Term ())
+    }
 
 
 initelts =
-    Array.fromList
-        [ Array.fromList [ "1", "7", "8" ]
-        , Array.fromList [ "2", "5", "6" ]
-        , Array.fromList [ "9", "0", "0" ]
-        ]
+    Array.map
+        (Array.map
+            (\s ->
+                { code = s
+                , prog = Err ""
+                , result = Err ""
+                }
+            )
+        )
+    <|
+        Array.fromList
+            [ Array.fromList [ "1", "7", "8" ]
+            , Array.fromList [ "2", "5", "6" ]
+            , Array.fromList [ "9", "0", "0" ]
+            ]
 
 
 sheetlang =
@@ -85,14 +102,30 @@ eview model =
         }
 
 
-viewCell : Int -> Int -> String -> Element Msg
-viewCell xi yi val =
-    EI.text [ width fill ]
-        { onChange = \v -> CellVal xi yi v
-        , text = val
-        , placeholder = Nothing
-        , label = EI.labelHidden ("cell" ++ String.fromInt xi ++ "," ++ String.fromInt yi)
-        }
+viewCell : Int -> Int -> Cell -> Element Msg
+viewCell xi yi cell =
+    column [ width fill ]
+        [ EI.text [ width fill ]
+            { onChange = \v -> CellVal xi yi v
+            , text = cell.code
+            , placeholder = Nothing
+            , label = EI.labelHidden ("cell" ++ String.fromInt xi ++ "," ++ String.fromInt yi)
+            }
+        , el [ width fill ] <|
+            E.text
+                (case cell.result of
+                    Ok term ->
+                        showTerm term
+
+                    Err s ->
+                        "err: " ++ s
+                )
+        ]
+
+
+evalCells : Array (Array Cell) -> Array (Array Cell)
+evalCells cells =
+    cells
 
 
 view : Model -> Browser.Document Msg
@@ -102,6 +135,11 @@ view model =
         [ E.layout [] <| eview model
         ]
     }
+
+
+defCell : String -> Cell
+defCell s =
+    { code = s, prog = Err "", result = Err "" }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -121,7 +159,7 @@ update msg model =
                         |> Maybe.map
                             (\rowarray ->
                                 Debug.log "elts:" <|
-                                    Array.set yi (Array.set xi val rowarray) model.elts
+                                    Array.set yi (Array.set xi (defCell val) rowarray) model.elts
                             )
                         |> Maybe.withDefault model.elts
               }
