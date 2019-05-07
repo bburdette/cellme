@@ -1,12 +1,13 @@
-module Cellme exposing (Cell, CellState(..), CellStatus(..), PRes(..), PSideEffectorFn, RunState(..), cellVal, evalArgsPSideEffector, sheetlang)
+module Cellme exposing (Cell, CellState(..), CellStatus(..), PRes(..), PSideEffectorFn, RunState(..), cellVal, cellme, evalArgsPSideEffector, evalCell, evalCells, runCellBody)
 
 import Array exposing (Array)
 import Dict exposing (Dict)
 import Eval exposing (evalBody, evalTerm, evalTerms)
-import EvalStep exposing (EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
+import EvalStep exposing (EvalBodyStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
 import Prelude exposing (BuiltInFn)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm, showTerms)
+import StateGet exposing (getEvalBodyStepState)
 
 
 type CellState
@@ -29,9 +30,53 @@ type CellStatus
 
 
 type RunState
-    = RsRunning (EvalTermsStep CellState)
+    = RsBlocked (EvalBodyStep CellState) Int Int
     | RsErr String
     | RsOk (Term CellState)
+
+
+evalCell : Array (Array Cell) -> Cell -> Cell
+evalCell cells cell =
+    let
+        prog =
+            Run.compile cell.code
+    in
+    case prog of
+        Err _ ->
+            { cell | prog = prog }
+
+        Ok p ->
+            { cell
+                | runstate =
+                    runCellBody (EbStart cellme (CellState { cells = cells, cellstatus = AllGood }) p)
+            }
+
+
+
+-- should eval all cells, resulting in an updated array, together with
+-- a queue of cells waiting on other cells.
+
+
+evalCells : Array (Array Cell) -> Array (Array Cell)
+evalCells initcells =
+    let
+        unevaledCells =
+            initcells
+
+        {- initcells
+           |> Array.map
+               (\cellcolumn ->
+                   cellcolumn
+                       |> Array.map (\cell -> { cell | runstate = RsErr "unevaled" })
+                       )
+        -}
+    in
+    unevaledCells
+        |> Array.map
+            (\cellcolumn ->
+                cellcolumn
+                    |> Array.map (evalCell unevaledCells)
+            )
 
 
 
@@ -40,19 +85,42 @@ type RunState
 
 {-| function type to pass to evalArgsSideEffector
 -}
-type PRes a
-    = PrOk ( NameSpace a, a, Term a )
-    | PrPause a
+type PRes
+    = PrOk ( NameSpace CellState, CellState, Term CellState )
+    | PrPause CellState
     | PrErr String
 
 
-type alias PSideEffectorFn a =
-    NameSpace a -> a -> List (Term a) -> PRes a
+type alias PSideEffectorFn =
+    NameSpace CellState -> CellState -> List (Term CellState) -> PRes
+
+
+runCellBody : EvalBodyStep CellState -> RunState
+runCellBody ebs =
+    case ebs of
+        EbError e ->
+            RsErr e
+
+        EbFinal ns state term ->
+            RsOk term
+
+        _ ->
+            case getEvalBodyStepState ebs of
+                Just (CellState s) ->
+                    case s.cellstatus of
+                        AllGood ->
+                            runCellBody (evalBody ebs)
+
+                        Blocked xi yi ->
+                            RsBlocked ebs xi yi
+
+                Nothing ->
+                    RsErr "error - no step state"
 
 
 {-| make a SideEffector function where arguments are evaled before the SideEffectorFn function is called.
 -}
-evalArgsPSideEffector : PSideEffectorFn a -> SideEffector a
+evalArgsPSideEffector : PSideEffectorFn -> SideEffector CellState
 evalArgsPSideEffector fn =
     \step ->
         case step of
@@ -94,14 +162,14 @@ evalArgsPSideEffector fn =
                 step
 
 
-sheetlang =
+cellme =
     Prelude.prelude
         |> Dict.union Prelude.math
-        |> Dict.insert "cellVal"
+        |> Dict.insert "cv"
             (TSideEffector (evalArgsPSideEffector cellVal))
 
 
-cellVal : PSideEffectorFn CellState
+cellVal : PSideEffectorFn
 cellVal ns (CellState state) args =
     case args of
         [ TNumber x, TNumber y ] ->
@@ -117,11 +185,11 @@ cellVal ns (CellState state) args =
                 |> Maybe.map
                     (\cell ->
                         case cell.runstate of
-                            RsRunning rs ->
+                            RsBlocked rs _ _ ->
                                 PrPause <| CellState { state | cellstatus = Blocked xi yi }
 
                             RsErr e ->
-                                PrErr e
+                                PrPause <| CellState { state | cellstatus = Blocked xi yi }
 
                             RsOk val ->
                                 PrOk ( ns, CellState { state | cellstatus = AllGood }, val )

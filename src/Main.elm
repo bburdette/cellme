@@ -23,6 +23,7 @@ import Toop as T
 type Msg
     = Noop
     | CellVal Int Int String
+    | EvalButton
 
 
 type alias Model =
@@ -62,11 +63,18 @@ eview model =
                             |> Maybe.withDefault (text "err")
                 }
     in
-    indexedTable [ width fill, height fill ]
-        { data = Array.toList model.elts
-        , columns =
-            List.map colf (List.range 0 (Array.length model.elts - 1))
-        }
+    column [ width fill, height fill ]
+        [ EI.button []
+            { onPress = Just EvalButton
+            , label = text "eval"
+            }
+        , indexedTable
+            [ width fill, height fill ]
+            { data = Array.toList model.elts
+            , columns =
+                List.map colf (List.range 0 (Array.length model.elts - 1))
+            }
+        ]
 
 
 viewCell : Int -> Int -> Cell -> Element Msg
@@ -87,15 +95,10 @@ viewCell xi yi cell =
                     RsErr s ->
                         "err: " ++ s
 
-                    RsRunning _ ->
-                        "blocked I guess"
+                    RsBlocked _ xib yib ->
+                        "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
                 )
         ]
-
-
-evalCells : Array (Array Cell) -> Array (Array Cell)
-evalCells cells =
-    cells
 
 
 view : Model -> Browser.Document Msg
@@ -135,6 +138,9 @@ update msg model =
               }
             , Cmd.none
             )
+
+        EvalButton ->
+            ( { model | elts = evalCells model.elts }, Cmd.none )
 
 
 main =
