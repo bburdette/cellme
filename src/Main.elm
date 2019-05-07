@@ -44,7 +44,7 @@ initelts =
         Array.fromList
             [ Array.fromList [ "1", "7", "8" ]
             , Array.fromList [ "2", "5", "6" ]
-            , Array.fromList [ "9", "0", "0" ]
+            , Array.fromList [ "9", "(cv 1 0)", "0" ]
             ]
 
 

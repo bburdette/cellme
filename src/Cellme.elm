@@ -35,6 +35,15 @@ type RunState
     | RsOk (Term CellState)
 
 
+{-| the cell language is schelme plus 'cv'
+-}
+cellme =
+    Prelude.prelude
+        |> Dict.union Prelude.math
+        |> Dict.insert "cv"
+            (TSideEffector (evalArgsPSideEffector cellVal))
+
+
 evalCell : Array (Array Cell) -> Cell -> Cell
 evalCell cells cell =
     let
@@ -52,11 +61,9 @@ evalCell cells cell =
             }
 
 
-
--- should eval all cells, resulting in an updated array, together with
--- a queue of cells waiting on other cells.
-
-
+{-| should eval all cells, resulting in an updated array, together with
+a queue of cells waiting on other cells.
+-}
 evalCells : Array (Array Cell) -> Array (Array Cell)
 evalCells initcells =
     let
@@ -79,18 +86,14 @@ evalCells initcells =
             )
 
 
-
--- ok make a special sideeffector evaluator that can result in paused execution.
-
-
-{-| function type to pass to evalArgsSideEffector
--}
 type PRes
     = PrOk ( NameSpace CellState, CellState, Term CellState )
     | PrPause CellState
     | PrErr String
 
 
+{-| function type to pass to evalArgsSideEffector
+-}
 type alias PSideEffectorFn =
     NameSpace CellState -> CellState -> List (Term CellState) -> PRes
 
@@ -118,7 +121,7 @@ runCellBody ebs =
                     RsErr "error - no step state"
 
 
-{-| make a SideEffector function where arguments are evaled before the SideEffectorFn function is called.
+{-| just like the regular evalArgsSideEffector, except checks for PrPause from the fn.
 -}
 evalArgsPSideEffector : PSideEffectorFn -> SideEffector CellState
 evalArgsPSideEffector fn =
@@ -160,13 +163,6 @@ evalArgsPSideEffector fn =
 
             SideEffectorError _ ->
                 step
-
-
-cellme =
-    Prelude.prelude
-        |> Dict.union Prelude.math
-        |> Dict.insert "cv"
-            (TSideEffector (evalArgsPSideEffector cellVal))
 
 
 cellVal : PSideEffectorFn
