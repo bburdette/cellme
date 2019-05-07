@@ -61,8 +61,7 @@ evalCell cells cell =
             }
 
 
-{-| should eval all cells, resulting in an updated array, together with
-a queue of cells waiting on other cells.
+{-| should eval all cells, resulting in an updated array.
 -}
 evalCells : Array (Array Cell) -> Array (Array Cell)
 evalCells initcells =
@@ -193,4 +192,4 @@ cellVal ns (CellState state) args =
                 |> Maybe.withDefault (PrErr <| "cell not found: " ++ String.fromInt xi ++ ", " ++ String.fromInt yi)
 
         _ ->
-            PrErr (String.concat ("setColor args should be 3 numbers!  " :: List.map showTerm args))
+            PrErr (String.concat ("cv args should be 3 numbers!  " :: List.map showTerm args))
