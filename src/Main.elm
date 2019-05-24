@@ -44,7 +44,7 @@ initelts =
         Array.fromList
             [ Array.fromList [ "1", "7", "8" ]
             , Array.fromList [ "2", "5", "6" ]
-            , Array.fromList [ "9", "(cv 1 0)", "0" ]
+            , Array.fromList [ "9", "(+ (cv 1 0) (cv 1 1))", "0" ]
             ]
 
 
@@ -64,7 +64,11 @@ eview model =
                 }
     in
     column [ width fill, height fill, spacing 5, padding 5 ]
-        [ EI.button
+        [ newTabLink []
+            { url = "https://github.com/bburdette/elm-sheet/"
+            , label = el [ Font.color (rgb 0 0 0.6) ] <| text "elm-sheet on github"
+            }
+        , EI.button
             [ BD.color (rgb 0.5 0.5 0.5)
             , Font.color (rgb 1 1 1)
             , Border.color (rgb 0 0 0.6)
