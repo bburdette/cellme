@@ -7,7 +7,7 @@ import Browser.Events as BE
 import Browser.Navigation as BN
 import Cellme exposing (..)
 import Dict exposing (Dict)
-import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
+import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, paddingXY, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
 import Element.Background as BD
 import Element.Border as Border
 import Element.Events as EE
@@ -64,7 +64,13 @@ eview model =
                 }
     in
     column [ width fill, height fill ]
-        [ EI.button []
+        [ EI.button
+            [ BD.color (rgb 0 0.1 0.7)
+            , Font.color (rgb 1 1 1)
+            , Border.color (rgb 0 0 0.6)
+            , paddingXY 5 3
+            , Border.rounded 5
+            ]
             { onPress = Just EvalButton
             , label = text "eval"
             }
