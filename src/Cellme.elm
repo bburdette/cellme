@@ -110,13 +110,6 @@ continueCell cells cell =
                     cell
 
 
-
--- how to run all cells fully.
--- 1) run all cells from the start.
--- 2) check for loops.
--- 3)
-
-
 type FullEvalResult
     = FeOk
     | FeLoop
