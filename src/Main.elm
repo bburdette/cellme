@@ -55,15 +55,41 @@ eview model =
     let
         colf =
             \colidx ->
-                { header = text (String.fromInt colidx)
-                , width = fill
+                let
+                    ci =
+                        colidx - 1
+                in
+                { header =
+                    if colidx == 0 then
+                        column [ Font.bold ]
+                            [ text "x:"
+                            , el [] <| text "y"
+                            ]
+
+                    else
+                        text (String.fromInt ci)
+                , width =
+                    if colidx == 0 then
+                        shrink
+
+                    else
+                        fill
                 , view =
                     \rowidx array ->
-                        Array.get colidx array
-                            |> Maybe.map
-                                (viewCell colidx rowidx)
-                            |> Maybe.withDefault (text "err")
+                        if colidx == 0 then
+                            text (String.fromInt rowidx)
+
+                        else
+                            Array.get ci array
+                                |> Maybe.map
+                                    (viewCell ci rowidx)
+                                |> Maybe.withDefault (text "err")
                 }
+
+        rl =
+            Array.get 0 model.elts
+                |> Maybe.map Array.length
+                |> Maybe.withDefault 0
     in
     column [ width fill, height fill, spacing 5, padding 5 ]
         [ newTabLink []
@@ -96,7 +122,7 @@ eview model =
             [ width fill, height fill ]
             { data = Array.toList model.elts
             , columns =
-                List.map colf (List.range 0 (Array.length model.elts - 1))
+                List.map colf (List.range 0 rl)
             }
         ]
 
