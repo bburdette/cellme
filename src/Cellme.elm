@@ -236,10 +236,6 @@ evalCellsFully initcells =
 
 runCellsFully : Array (Array Cell) -> ( Array (Array Cell), FullEvalResult )
 runCellsFully cells =
-    let
-        _ =
-            Debug.log "rcf: " cells
-    in
     if loopCheck cells then
         ( cells, FeLoop )
 
@@ -401,10 +397,6 @@ cellVal ns (CellState state) args =
                 |> Maybe.andThen (Array.get xi)
                 |> Maybe.map
                     (\cell ->
-                        let
-                            _ =
-                                Debug.log "cellVal got: " ( xi, yi, cell )
-                        in
                         case cell.runstate of
                             RsBlocked rs _ _ ->
                                 PrPause <| CellState { state | cellstatus = Blocked xi yi }

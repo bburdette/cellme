@@ -145,17 +145,12 @@ update msg model =
             ( model, Cmd.none )
 
         CellVal xi yi val ->
-            let
-                _ =
-                    Debug.log "CellVal" ( xi, yi, val )
-            in
             ( { model
                 | elts =
                     Array.get yi model.elts
                         |> Maybe.map
                             (\rowarray ->
-                                Debug.log "elts:" <|
-                                    Array.set yi (Array.set xi (defCell val) rowarray) model.elts
+                                Array.set yi (Array.set xi (defCell val) rowarray) model.elts
                             )
                         |> Maybe.withDefault model.elts
               }
@@ -168,8 +163,7 @@ update msg model =
         RunButton ->
             let
                 ( cells, result ) =
-                    Debug.log "rcf result: " <|
-                        evalCellsFully model.elts
+                    evalCellsFully model.elts
             in
             ( { model | elts = cells }, Cmd.none )
 
