@@ -168,7 +168,8 @@ update msg model =
         RunButton ->
             let
                 ( cells, result ) =
-                    runCellsFully model.elts
+                    Debug.log "rcf result: " <|
+                        evalCellsFully model.elts
             in
             ( { model | elts = cells }, Cmd.none )
 

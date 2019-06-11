@@ -1,4 +1,4 @@
-module Cellme exposing (Cell, CellState(..), CellStatus(..), FullEvalResult(..), PRes(..), PSideEffectorFn, RunState(..), arrayFirst, arrayHas, cellVal, cellme, compileCells, compileError, continueCell, evalArgsPSideEffector, evalCell, evalCellsFully, evalCellsOnce, isLoopedCell, loopCheck, maybeIsJust, runCell, runCellBody, runCellsFully)
+module Cellme exposing (Cell, CellState(..), CellStatus(..), FullEvalResult(..), PRes(..), PSideEffectorFn, RunState(..), arrayFirst, arrayHas, cellVal, cellme, compileCells, compileError, continueCell, evalArgsPSideEffector, evalCell, evalCellsFully, evalCellsOnce, isLoopedCell, loopCheck, maybeIsJust, runCell, runCellBody)
 
 import Array exposing (Array)
 import Dict exposing (Dict)
@@ -8,6 +8,7 @@ import Prelude exposing (BuiltInFn)
 import Run exposing (compile, runCount)
 import Show exposing (showTerm, showTerms)
 import StateGet exposing (getEvalBodyStepState)
+import StateSet exposing (setEvalBodyStepState)
 
 
 {-| the state that is used during cell eval.
@@ -61,6 +62,20 @@ compileCells cells =
             )
 
 
+clearCells : Array (Array Cell) -> Array (Array Cell)
+clearCells cells =
+    let
+        clearCell =
+            \cell -> { cell | runstate = RsErr "unevaled" }
+    in
+    cells
+        |> Array.map
+            (\cellcolumn ->
+                cellcolumn
+                    |> Array.map clearCell
+            )
+
+
 {-| run cell from the start.
 -}
 runCell : Array (Array Cell) -> Cell -> Cell
@@ -88,7 +103,7 @@ continueCell cells cell =
             case cell.runstate of
                 RsBlocked cb xi yi ->
                     { cell
-                        | runstate = runCellBody cb
+                        | runstate = runCellBody (setEvalBodyStepState cb (CellState { cells = cells, cellstatus = AllGood }))
                     }
 
                 _ ->
@@ -206,15 +221,9 @@ evalCellsFully : Array (Array Cell) -> ( Array (Array Cell), FullEvalResult )
 evalCellsFully initcells =
     let
         compiledCells =
-            compileCells initcells
-
-        {- initcells
-           |> Array.map
-               (\cellcolumn ->
-                   cellcolumn
-                       |> Array.map (\cell -> { cell | runstate = RsErr "unevaled" })
-                       )
-        -}
+            initcells
+                |> compileCells
+                |> clearCells
     in
     if compileError compiledCells then
         ( compiledCells, FeCompileError )
@@ -227,6 +236,10 @@ evalCellsFully initcells =
 
 runCellsFully : Array (Array Cell) -> ( Array (Array Cell), FullEvalResult )
 runCellsFully cells =
+    let
+        _ =
+            Debug.log "rcf: " cells
+    in
     if loopCheck cells then
         ( cells, FeLoop )
 
@@ -388,6 +401,10 @@ cellVal ns (CellState state) args =
                 |> Maybe.andThen (Array.get xi)
                 |> Maybe.map
                     (\cell ->
+                        let
+                            _ =
+                                Debug.log "cellVal got: " ( xi, yi, cell )
+                        in
                         case cell.runstate of
                             RsBlocked rs _ _ ->
                                 PrPause <| CellState { state | cellstatus = Blocked xi yi }
