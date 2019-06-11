@@ -24,6 +24,7 @@ type Msg
     = Noop
     | CellVal Int Int String
     | EvalButton
+    | RunButton
 
 
 type alias Model =
@@ -68,16 +69,28 @@ eview model =
             { url = "https://github.com/bburdette/elm-sheet/"
             , label = el [ Font.color (rgb 0 0 0.6) ] <| text "elm-sheet on github"
             }
-        , EI.button
-            [ BD.color (rgb 0.5 0.5 0.5)
-            , Font.color (rgb 1 1 1)
-            , Border.color (rgb 0 0 0.6)
-            , paddingXY 5 3
-            , Border.rounded 5
+        , row []
+            [ EI.button
+                [ BD.color (rgb 0.5 0.5 0.5)
+                , Font.color (rgb 1 1 1)
+                , Border.color (rgb 0 0 0.6)
+                , paddingXY 5 3
+                , Border.rounded 5
+                ]
+                { onPress = Just EvalButton
+                , label = text "eval"
+                }
+            , EI.button
+                [ BD.color (rgb 0.5 0.5 0.5)
+                , Font.color (rgb 1 1 1)
+                , Border.color (rgb 0 0 0.6)
+                , paddingXY 5 3
+                , Border.rounded 5
+                ]
+                { onPress = Just RunButton
+                , label = text "run"
+                }
             ]
-            { onPress = Just EvalButton
-            , label = text "eval"
-            }
         , indexedTable
             [ width fill, height fill ]
             { data = Array.toList model.elts
@@ -132,17 +145,12 @@ update msg model =
             ( model, Cmd.none )
 
         CellVal xi yi val ->
-            let
-                _ =
-                    Debug.log "CellVal" ( xi, yi, val )
-            in
             ( { model
                 | elts =
                     Array.get yi model.elts
                         |> Maybe.map
                             (\rowarray ->
-                                Debug.log "elts:" <|
-                                    Array.set yi (Array.set xi (defCell val) rowarray) model.elts
+                                Array.set yi (Array.set xi (defCell val) rowarray) model.elts
                             )
                         |> Maybe.withDefault model.elts
               }
@@ -150,7 +158,14 @@ update msg model =
             )
 
         EvalButton ->
-            ( { model | elts = evalCells model.elts }, Cmd.none )
+            ( { model | elts = evalCellsOnce model.elts }, Cmd.none )
+
+        RunButton ->
+            let
+                ( cells, result ) =
+                    evalCellsFully model.elts
+            in
+            ( { model | elts = cells }, Cmd.none )
 
 
 main =
