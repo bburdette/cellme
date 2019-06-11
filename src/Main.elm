@@ -38,7 +38,7 @@ initelts =
             (\s ->
                 { code = s
                 , prog = Err ""
-                , runstate = RsErr ""
+                , runstate = RsUnevaled
                 }
             )
         )
@@ -111,20 +111,18 @@ viewCell xi yi cell =
             , label = EI.labelHidden ("cell" ++ String.fromInt xi ++ "," ++ String.fromInt yi)
             }
         , el [ width fill ] <|
-            E.text
-                (case cell.runstate of
-                    RsOk term ->
-                        showTerm term
+            case cell.runstate of
+                RsOk term ->
+                    text <| showTerm term
 
-                    RsErr s ->
-                        "err: " ++ s
+                RsErr s ->
+                    el [ Font.color <| rgb 1 0.1 0.1 ] <| text <| "err: " ++ s
 
-                    RsUnevaled ->
-                        "unevaled"
+                RsUnevaled ->
+                    text <| "unevaled"
 
-                    RsBlocked _ xib yib ->
-                        "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
-                )
+                RsBlocked _ xib yib ->
+                    text <| "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
         ]
 
 

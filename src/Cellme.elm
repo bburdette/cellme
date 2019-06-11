@@ -39,6 +39,11 @@ type RunState
     | RsOk (Term CellState)
 
 
+getCell : Array (Array Cell) -> Int -> Int -> Maybe Cell
+getCell cells xi yi =
+    Array.get yi cells |> Maybe.andThen (Array.get xi)
+
+
 {-| the cell language is schelme plus 'cv'
 -}
 cellme : NameSpace CellState
@@ -102,7 +107,7 @@ continueCell cells cell =
 
         Ok _ ->
             case cell.runstate of
-                RsBlocked cb xi yi ->
+                RsBlocked cb _ _ ->
                     { cell
                         | runstate = runCellBody (setEvalBodyStepState cb (CellState { cells = cells, cellstatus = AllGood }))
                     }
@@ -185,7 +190,7 @@ isLoopedCell cells loop cell =
                 Just loop
 
             else
-                Array.get xi cells |> Maybe.andThen (Array.get yi) |> Maybe.andThen (isLoopedCell cells (( xi, yi ) :: loop))
+                getCell cells xi yi |> Maybe.andThen (isLoopedCell cells (( xi, yi ) :: loop))
 
         RsUnevaled ->
             Nothing
@@ -333,7 +338,7 @@ runCellBody ebs =
         EbError e ->
             RsErr e
 
-        EbFinal ns state term ->
+        EbFinal _ _ term ->
             RsOk term
 
         _ ->
@@ -384,7 +389,7 @@ evalArgsPSideEffector fn =
             SideEffectorEval _ _ _ _ ->
                 SideEffectorError "not expecting SideEffectorEval!"
 
-            SideEffectorBody ns state workterms evalstep ->
+            SideEffectorBody _ _ _ _ ->
                 SideEffectorError "unexpected SideEffectorBody"
 
             SideEffectorFinal _ _ _ ->
@@ -410,10 +415,10 @@ cellVal ns (CellState state) args =
                 |> Maybe.map
                     (\cell ->
                         case cell.runstate of
-                            RsBlocked rs _ _ ->
+                            RsBlocked _ _ _ ->
                                 PrPause <| CellState { state | cellstatus = Blocked xi yi }
 
-                            RsErr e ->
+                            RsErr _ ->
                                 PrErr <| "Blocked on error in : " ++ String.fromInt xi ++ ", " ++ String.fromInt yi
 
                             RsUnevaled ->
