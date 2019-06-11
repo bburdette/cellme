@@ -1,4 +1,4 @@
-module Cellme exposing (Cell, CellState(..), CellStatus(..), PRes(..), PSideEffectorFn, RunState(..), cellVal, cellme, evalArgsPSideEffector, evalCell, evalCells, runCellBody)
+module Cellme exposing (Cell, CellState(..), CellStatus(..), FullEvalResult(..), PRes(..), PSideEffectorFn, RunState(..), arrayFirst, arrayHas, cellVal, cellme, compileCells, compileError, continueCell, evalArgsPSideEffector, evalCell, evalCellsFully, evalCellsOnce, isLoopedCell, loopCheck, maybeIsJust, runCell, runCellBody, runCellsFully)
 
 import Array exposing (Array)
 import Dict exposing (Dict)
@@ -10,6 +10,8 @@ import Show exposing (showTerm, showTerms)
 import StateGet exposing (getEvalBodyStepState)
 
 
+{-| the state that is used during cell eval.
+-}
 type CellState
     = CellState
         { cells : Array (Array Cell)
@@ -37,11 +39,218 @@ type RunState
 
 {-| the cell language is schelme plus 'cv'
 -}
+cellme : NameSpace CellState
 cellme =
     Prelude.prelude
         |> Dict.union Prelude.math
         |> Dict.insert "cv"
             (TSideEffector (evalArgsPSideEffector cellVal))
+
+
+compileCells : Array (Array Cell) -> Array (Array Cell)
+compileCells cells =
+    let
+        compileCell =
+            \cell -> { cell | prog = Run.compile cell.code }
+    in
+    cells
+        |> Array.map
+            (\cellcolumn ->
+                cellcolumn
+                    |> Array.map compileCell
+            )
+
+
+{-| run cell from the start.
+-}
+runCell : Array (Array Cell) -> Cell -> Cell
+runCell cells cell =
+    case cell.prog of
+        Err _ ->
+            cell
+
+        Ok p ->
+            { cell
+                | runstate =
+                    runCellBody (EbStart cellme (CellState { cells = cells, cellstatus = AllGood }) p)
+            }
+
+
+{-| continue running the cell.
+-}
+continueCell : Array (Array Cell) -> Cell -> Cell
+continueCell cells cell =
+    case cell.prog of
+        Err _ ->
+            cell
+
+        Ok _ ->
+            case cell.runstate of
+                RsBlocked cb xi yi ->
+                    { cell
+                        | runstate = runCellBody cb
+                    }
+
+                _ ->
+                    cell
+
+
+
+-- how to run all cells fully.
+-- 1) run all cells from the start.
+-- 2) check for loops.
+-- 3)
+
+
+type FullEvalResult
+    = FeOk
+    | FeLoop
+    | FeCompileError
+
+
+arrayHas : (a -> Bool) -> Array a -> Bool
+arrayHas condf array =
+    let
+        arrayHasHelper : Int -> Bool
+        arrayHasHelper idx =
+            case
+                Array.get idx array
+                    |> Maybe.map condf
+            of
+                Nothing ->
+                    False
+
+                Just b ->
+                    if b then
+                        True
+
+                    else
+                        arrayHasHelper (idx + 1)
+    in
+    arrayHasHelper 0
+
+
+arrayFirst : (a -> Maybe b) -> Array a -> Maybe b
+arrayFirst condf array =
+    let
+        arrayFirstHelper : Int -> Maybe b
+        arrayFirstHelper idx =
+            Array.get idx array
+                |> Maybe.andThen
+                    (\a ->
+                        case condf a of
+                            Nothing ->
+                                arrayFirstHelper (idx + 1)
+
+                            Just b ->
+                                Just b
+                    )
+    in
+    arrayFirstHelper 0
+
+
+compileError : Array (Array Cell) -> Bool
+compileError array =
+    array
+        |> arrayHas
+            (\cc ->
+                cc
+                    |> arrayHas
+                        (\cell ->
+                            case cell.prog of
+                                Err _ ->
+                                    True
+
+                                _ ->
+                                    False
+                        )
+            )
+
+
+isLoopedCell : Array (Array Cell) -> List ( Int, Int ) -> Cell -> Maybe (List ( Int, Int ))
+isLoopedCell cells loop cell =
+    case cell.runstate of
+        RsBlocked _ xi yi ->
+            if List.member ( xi, yi ) loop then
+                Just loop
+
+            else
+                Array.get xi cells |> Maybe.andThen (Array.get yi) |> Maybe.andThen (isLoopedCell cells (( xi, yi ) :: loop))
+
+        RsErr _ ->
+            Nothing
+
+        RsOk _ ->
+            Nothing
+
+
+maybeIsJust : Maybe a -> Bool
+maybeIsJust mba =
+    case mba of
+        Just _ ->
+            True
+
+        Nothing ->
+            False
+
+
+loopCheck : Array (Array Cell) -> Bool
+loopCheck cells =
+    cells
+        |> arrayHas (arrayHas (\cell -> isLoopedCell cells [] cell |> maybeIsJust))
+
+
+{-| should eval all cells, resulting in an updated array and result type.
+-}
+evalCellsFully : Array (Array Cell) -> ( Array (Array Cell), FullEvalResult )
+evalCellsFully initcells =
+    let
+        compiledCells =
+            compileCells initcells
+
+        {- initcells
+           |> Array.map
+               (\cellcolumn ->
+                   cellcolumn
+                       |> Array.map (\cell -> { cell | runstate = RsErr "unevaled" })
+                       )
+        -}
+    in
+    if compileError compiledCells then
+        ( compiledCells, FeCompileError )
+
+    else
+        compiledCells
+            |> Array.map (Array.map (runCell compiledCells))
+            |> runCellsFully
+
+
+runCellsFully : Array (Array Cell) -> ( Array (Array Cell), FullEvalResult )
+runCellsFully cells =
+    if loopCheck cells then
+        ( cells, FeLoop )
+
+    else if
+        cells
+            |> arrayHas
+                (arrayHas
+                    (\cell ->
+                        case cell.runstate of
+                            RsBlocked _ _ _ ->
+                                True
+
+                            RsErr _ ->
+                                False
+
+                            RsOk _ ->
+                                False
+                    )
+                )
+    then
+        runCellsFully (Array.map (Array.map (continueCell cells)) cells)
+
+    else
+        ( cells, FeOk )
 
 
 evalCell : Array (Array Cell) -> Cell -> Cell
@@ -63,8 +272,8 @@ evalCell cells cell =
 
 {-| should eval all cells, resulting in an updated array.
 -}
-evalCells : Array (Array Cell) -> Array (Array Cell)
-evalCells initcells =
+evalCellsOnce : Array (Array Cell) -> Array (Array Cell)
+evalCellsOnce initcells =
     let
         unevaledCells =
             initcells
