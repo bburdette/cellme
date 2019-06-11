@@ -31,6 +31,7 @@ type alias Model =
     { elts : Array (Array Cell) }
 
 
+initelts : Array (Array Cell)
 initelts =
     Array.map
         (Array.map
@@ -118,6 +119,9 @@ viewCell xi yi cell =
                     RsErr s ->
                         "err: " ++ s
 
+                    RsUnevaled ->
+                        "unevaled"
+
                     RsBlocked _ xib yib ->
                         "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
                 )
@@ -168,6 +172,7 @@ update msg model =
             ( { model | elts = cells }, Cmd.none )
 
 
+main : Platform.Program () Model Msg
 main =
     Browser.document
         { init = \() -> ( { elts = initelts }, Cmd.none )
