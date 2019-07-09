@@ -96,7 +96,7 @@ eview model =
             { url = "https://github.com/bburdette/elm-sheet/"
             , label = el [ Font.color (rgb 0 0 0.6) ] <| text "elm-sheet on github"
             }
-        , row []
+        , row [ spacing 5 ]
             [ EI.button
                 [ BD.color (rgb 0.5 0.5 0.5)
                 , Font.color (rgb 1 1 1)
@@ -105,7 +105,7 @@ eview model =
                 , Border.rounded 5
                 ]
                 { onPress = Just EvalButton
-                , label = text "eval"
+                , label = text "step"
                 }
             , EI.button
                 [ BD.color (rgb 0.5 0.5 0.5)
