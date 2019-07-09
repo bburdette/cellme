@@ -31,13 +31,14 @@ type alias Model =
     { elts : Array (Array Cell) }
 
 
+initelts : Array (Array Cell)
 initelts =
     Array.map
         (Array.map
             (\s ->
                 { code = s
                 , prog = Err ""
-                , runstate = RsErr ""
+                , runstate = RsUnevaled
                 }
             )
         )
@@ -54,22 +55,48 @@ eview model =
     let
         colf =
             \colidx ->
-                { header = text (String.fromInt colidx)
-                , width = fill
+                let
+                    ci =
+                        colidx - 1
+                in
+                { header =
+                    if colidx == 0 then
+                        column [ Font.bold ]
+                            [ text "x:"
+                            , el [] <| text "y"
+                            ]
+
+                    else
+                        text (String.fromInt ci)
+                , width =
+                    if colidx == 0 then
+                        shrink
+
+                    else
+                        fill
                 , view =
                     \rowidx array ->
-                        Array.get colidx array
-                            |> Maybe.map
-                                (viewCell colidx rowidx)
-                            |> Maybe.withDefault (text "err")
+                        if colidx == 0 then
+                            text (String.fromInt rowidx)
+
+                        else
+                            Array.get ci array
+                                |> Maybe.map
+                                    (viewCell ci rowidx)
+                                |> Maybe.withDefault (text "err")
                 }
+
+        rl =
+            Array.get 0 model.elts
+                |> Maybe.map Array.length
+                |> Maybe.withDefault 0
     in
     column [ width fill, height fill, spacing 5, padding 5 ]
         [ newTabLink []
             { url = "https://github.com/bburdette/elm-sheet/"
             , label = el [ Font.color (rgb 0 0 0.6) ] <| text "elm-sheet on github"
             }
-        , row []
+        , row [ spacing 5 ]
             [ EI.button
                 [ BD.color (rgb 0.5 0.5 0.5)
                 , Font.color (rgb 1 1 1)
@@ -78,7 +105,7 @@ eview model =
                 , Border.rounded 5
                 ]
                 { onPress = Just EvalButton
-                , label = text "eval"
+                , label = text "step"
                 }
             , EI.button
                 [ BD.color (rgb 0.5 0.5 0.5)
@@ -95,7 +122,7 @@ eview model =
             [ width fill, height fill ]
             { data = Array.toList model.elts
             , columns =
-                List.map colf (List.range 0 (Array.length model.elts - 1))
+                List.map colf (List.range 0 rl)
             }
         ]
 
@@ -110,17 +137,18 @@ viewCell xi yi cell =
             , label = EI.labelHidden ("cell" ++ String.fromInt xi ++ "," ++ String.fromInt yi)
             }
         , el [ width fill ] <|
-            E.text
-                (case cell.runstate of
-                    RsOk term ->
-                        showTerm term
+            case cell.runstate of
+                RsOk term ->
+                    text <| showTerm term
 
-                    RsErr s ->
-                        "err: " ++ s
+                RsErr s ->
+                    el [ Font.color <| rgb 1 0.1 0.1 ] <| text <| "err: " ++ s
 
-                    RsBlocked _ xib yib ->
-                        "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
-                )
+                RsUnevaled ->
+                    text <| "unevaled"
+
+                RsBlocked _ xib yib ->
+                    text <| "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
         ]
 
 
@@ -168,6 +196,7 @@ update msg model =
             ( { model | elts = cells }, Cmd.none )
 
 
+main : Platform.Program () Model Msg
 main =
     Browser.document
         { init = \() -> ( { elts = initelts }, Cmd.none )

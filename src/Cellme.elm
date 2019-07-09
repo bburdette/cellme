@@ -35,7 +35,13 @@ type CellStatus
 type RunState
     = RsBlocked (EvalBodyStep CellState) Int Int
     | RsErr String
+    | RsUnevaled
     | RsOk (Term CellState)
+
+
+getCell : Array (Array Cell) -> Int -> Int -> Maybe Cell
+getCell cells xi yi =
+    Array.get yi cells |> Maybe.andThen (Array.get xi)
 
 
 {-| the cell language is schelme plus 'cv'
@@ -66,7 +72,7 @@ clearCells : Array (Array Cell) -> Array (Array Cell)
 clearCells cells =
     let
         clearCell =
-            \cell -> { cell | runstate = RsErr "unevaled" }
+            \cell -> { cell | runstate = RsUnevaled }
     in
     cells
         |> Array.map
@@ -101,7 +107,7 @@ continueCell cells cell =
 
         Ok _ ->
             case cell.runstate of
-                RsBlocked cb xi yi ->
+                RsBlocked cb _ _ ->
                     { cell
                         | runstate = runCellBody (setEvalBodyStepState cb (CellState { cells = cells, cellstatus = AllGood }))
                     }
@@ -113,6 +119,7 @@ continueCell cells cell =
 type FullEvalResult
     = FeOk
     | FeLoop
+    | FeEvalError
     | FeCompileError
 
 
@@ -183,7 +190,10 @@ isLoopedCell cells loop cell =
                 Just loop
 
             else
-                Array.get xi cells |> Maybe.andThen (Array.get yi) |> Maybe.andThen (isLoopedCell cells (( xi, yi ) :: loop))
+                getCell cells xi yi |> Maybe.andThen (isLoopedCell cells (( xi, yi ) :: loop))
+
+        RsUnevaled ->
+            Nothing
 
         RsErr _ ->
             Nothing
@@ -200,6 +210,22 @@ maybeIsJust mba =
 
         Nothing ->
             False
+
+
+errorCheck : Array (Array Cell) -> Bool
+errorCheck cells =
+    cells
+        |> arrayHas
+            (arrayHas
+                (\cell ->
+                    case cell.runstate of
+                        RsErr _ ->
+                            True
+
+                        _ ->
+                            False
+                )
+            )
 
 
 loopCheck : Array (Array Cell) -> Bool
@@ -232,6 +258,9 @@ runCellsFully cells =
     if loopCheck cells then
         ( cells, FeLoop )
 
+    else if errorCheck cells then
+        ( cells, FeEvalError )
+
     else if
         cells
             |> arrayHas
@@ -240,6 +269,9 @@ runCellsFully cells =
                         case cell.runstate of
                             RsBlocked _ _ _ ->
                                 True
+
+                            RsUnevaled ->
+                                False
 
                             RsErr _ ->
                                 False
@@ -279,14 +311,6 @@ evalCellsOnce initcells =
     let
         unevaledCells =
             initcells
-
-        {- initcells
-           |> Array.map
-               (\cellcolumn ->
-                   cellcolumn
-                       |> Array.map (\cell -> { cell | runstate = RsErr "unevaled" })
-                       )
-        -}
     in
     unevaledCells
         |> Array.map
@@ -314,7 +338,7 @@ runCellBody ebs =
         EbError e ->
             RsErr e
 
-        EbFinal ns state term ->
+        EbFinal _ _ term ->
             RsOk term
 
         _ ->
@@ -365,7 +389,7 @@ evalArgsPSideEffector fn =
             SideEffectorEval _ _ _ _ ->
                 SideEffectorError "not expecting SideEffectorEval!"
 
-            SideEffectorBody ns state workterms evalstep ->
+            SideEffectorBody _ _ _ _ ->
                 SideEffectorError "unexpected SideEffectorBody"
 
             SideEffectorFinal _ _ _ ->
@@ -391,10 +415,13 @@ cellVal ns (CellState state) args =
                 |> Maybe.map
                     (\cell ->
                         case cell.runstate of
-                            RsBlocked rs _ _ ->
+                            RsBlocked _ _ _ ->
                                 PrPause <| CellState { state | cellstatus = Blocked xi yi }
 
-                            RsErr e ->
+                            RsErr _ ->
+                                PrErr <| "Blocked on error in : " ++ String.fromInt xi ++ ", " ++ String.fromInt yi
+
+                            RsUnevaled ->
                                 PrPause <| CellState { state | cellstatus = Blocked xi yi }
 
                             RsOk val ->
@@ -403,4 +430,4 @@ cellVal ns (CellState state) args =
                 |> Maybe.withDefault (PrErr <| "cell not found: " ++ String.fromInt xi ++ ", " ++ String.fromInt yi)
 
         _ ->
-            PrErr (String.concat ("cv args should be 3 numbers!  " :: List.map showTerm args))
+            PrErr (String.concat ("cv args should be 2 numbers!  " :: List.map showTerm args))
