@@ -33,25 +33,33 @@ type CellContainer id cc
 --     }
 
 
-myCellArray : CellContainer ( Int, Int ) { cells : Array (Array (Cell ( Int, Int ))) }
+type MyCellArray
+    = MyCellArray (CellContainer ( Int, Int ) { cells : Array (Array (Cell ( Int, Int ) MyCellArray)) })
+
+
+myCellArray : MyCellArray
 myCellArray =
-    CellContainer
-        { getCell = \( xi, yi ) (CellContainer cells) -> Array.get yi cells.cells |> Maybe.andThen (Array.get xi)
-        , cells = Array.empty
-        , map =
-            \fun (CellContainer cells) ->
-                CellContainer
-                    { cells
-                        | cells =
-                            cells.cells
-                                |> Array.map
-                                    (\cellcolumn ->
-                                        cellcolumn
-                                            |> Array.map fun
-                                    )
-                    }
-        , has = \fun (CellContainer cells) -> arraysHas fun cells.cells
-        }
+    MyCellArray
+        (CellContainer
+            { getCell = \( xi, yi ) (CellContainer cells) -> Array.get yi cells.cells |> Maybe.andThen (Array.get xi)
+            , cells = Array.empty
+            , map =
+                \fun (CellContainer cells) ->
+                    MyCellArray
+                        (CellContainer
+                            { cells
+                                | cells =
+                                    cells.cells
+                                        |> Array.map
+                                            (\cellcolumn ->
+                                                cellcolumn
+                                                    |> Array.map fun
+                                            )
+                            }
+                        )
+            , has = \fun (CellContainer cells) -> arraysHas fun cells.cells
+            }
+        )
 
 
 
