@@ -13,37 +13,45 @@ import StateSet exposing (setEvalBodyStepState)
 
 {-| the state that is used during cell eval.
 -}
-type CellContainer id
+type CellContainer id cc
     = CellContainer
-        { getCell : id -> CellContainer id -> Maybe (Cell id)
-        , map : (Cell id -> Cell id) -> CellContainer id -> CellContainer id
-        , has : (Cell id -> Bool) -> CellContainer id -> Bool
+        { cc
+            | getCell : id -> CellContainer id cc -> Maybe (Cell id cc)
+            , map : (Cell id cc -> Cell id cc) -> CellContainer id cc -> CellContainer id cc
+            , has : (Cell id cc -> Bool) -> CellContainer id cc -> Bool
 
-        -- , setCell : id -> Cell id -> Result String (CellContainer id)
+            -- , setCell : id -> Cell id cc -> Result String (CellContainer id)
         }
 
 
-type alias CellArray =
-    CellContainer ( Int, Int )
+
+-- type alias CellArray =
+--     { cells : Array (Array Int)
+--     , getCell : ( Int, Int ) -> CellContainer CellArray -> Maybe (Cell ( Int, Int ))
+--     , map : (Cell ( Int, Int ) -> Cell ( Int, Int )) -> CellContainer CellArray -> CellContainer CellArray
+--     , has : (Cell ( Int, Int ) -> Bool) -> CellContainer CellArray -> Bool
+--     }
 
 
-myCellArray : CellArray
+myCellArray : CellContainer ( Int, Int ) { cells : Array (Array (Cell ( Int, Int ))) }
 myCellArray =
-    { getCell = \( xi, yi ) cells -> Array.get yi cells.cells |> Maybe.andThen (Array.get xi)
-    , cells = Array.empty
-    , map =
-        \fun cells ->
-            { cells
-                | cells =
-                    cells.cells
-                        |> Array.map
-                            (\cellcolumn ->
-                                cellcolumn
-                                    |> Array.map fun
-                            )
-            }
-    , has = arraysHas
-    }
+    CellContainer
+        { getCell = \( xi, yi ) (CellContainer cells) -> Array.get yi cells.cells |> Maybe.andThen (Array.get xi)
+        , cells = Array.empty
+        , map =
+            \fun (CellContainer cells) ->
+                CellContainer
+                    { cells
+                        | cells =
+                            cells.cells
+                                |> Array.map
+                                    (\cellcolumn ->
+                                        cellcolumn
+                                            |> Array.map fun
+                                    )
+                    }
+        , has = \fun (CellContainer cells) -> arraysHas fun cells.cells
+        }
 
 
 
@@ -52,17 +60,17 @@ myCellArray =
 -- getCell icells xi yi =
 
 
-type CellState id
+type CellState id cc
     = CellState
-        { cells : CellContainer id
+        { cells : CellContainer id cc
         , cellstatus : CellStatus
         }
 
 
-type alias Cell id =
+type alias Cell id cs =
     { code : String
-    , prog : Result String (List (Term (CellState id)))
-    , runstate : RunState id
+    , prog : Result String (List (Term cs))
+    , runstate : RunState id cs
     }
 
 
@@ -71,16 +79,16 @@ type CellStatus
     | Blocked Int Int
 
 
-type RunState id
-    = RsBlocked (EvalBodyStep (CellState id)) id
+type RunState id cs
+    = RsBlocked (EvalBodyStep cs) id
     | RsErr String
     | RsUnevaled
-    | RsOk (Term (CellState id))
+    | RsOk (Term cs)
 
 
 {-| the cell language is schelme plus 'cv'
 -}
-cellme : NameSpace (CellState id)
+cellme : NameSpace (CellState id cc)
 cellme =
     Prelude.prelude
         |> Dict.union Prelude.math
@@ -88,7 +96,7 @@ cellme =
             (TSideEffector (evalArgsPSideEffector cellVal))
 
 
-compileCells : CellContainer id -> CellContainer id
+compileCells : CellContainer id cc -> CellContainer id cc
 compileCells cells =
     let
         compileCell =
@@ -97,7 +105,7 @@ compileCells cells =
     cells.map compileCell cells
 
 
-clearCells : CellContainer id -> CellContainer id
+clearCells : CellContainer id cc -> CellContainer id cc
 clearCells cells =
     let
         clearCell =
@@ -108,7 +116,7 @@ clearCells cells =
 
 {-| run cell from the start.
 -}
-runCell : CellContainer id -> Cell id -> Cell id
+runCell : CellContainer id cc -> Cell id cc -> Cell id cc
 runCell cells cell =
     case cell.prog of
         Err _ ->
@@ -123,7 +131,7 @@ runCell cells cell =
 
 {-| continue running the cell.
 -}
-continueCell : CellContainer id -> Cell id -> Cell id
+continueCell : CellContainer id cc -> Cell id cc -> Cell id cc
 continueCell cells cell =
     case cell.prog of
         Err _ ->
@@ -198,7 +206,7 @@ arrayFirst condf array =
     arrayFirstHelper 0
 
 
-compileError : CellContainer id -> Bool
+compileError : CellContainer id cc -> Bool
 compileError cells =
     cells.has
         (\cell ->
@@ -212,7 +220,7 @@ compileError cells =
         cells.cells
 
 
-isLoopedCell : CellContainer id -> List id -> Cell id -> Maybe (List id)
+isLoopedCell : CellContainer id cc -> List id -> Cell id cc -> Maybe (List id)
 isLoopedCell cells loop cell =
     case cell.runstate of
         RsBlocked _ id ->
@@ -242,7 +250,7 @@ maybeIsJust mba =
             False
 
 
-errorCheck : CellContainer id -> Bool
+errorCheck : CellContainer id cc -> Bool
 errorCheck cells =
     cells.has
         (\cell ->
@@ -256,14 +264,14 @@ errorCheck cells =
         cells.cells
 
 
-loopCheck : CellContainer id -> Bool
+loopCheck : CellContainer id cc -> Bool
 loopCheck cells =
     cells.has (\cell -> isLoopedCell cells [] cell |> maybeIsJust) cells.cells
 
 
 {-| should eval all cells, resulting in an updated array and result type.
 -}
-evalCellsFully : CellContainer id -> ( CellContainer id, FullEvalResult )
+evalCellsFully : CellContainer id cc -> ( CellContainer id cc, FullEvalResult )
 evalCellsFully (CellContainer initcells) =
     let
         compiledCells =
@@ -280,7 +288,7 @@ evalCellsFully (CellContainer initcells) =
             |> runCellsFully
 
 
-runCellsFully : CellContainer id -> ( CellContainer id, FullEvalResult )
+runCellsFully : CellContainer id cc -> ( CellContainer id cc, FullEvalResult )
 runCellsFully (CellContainer cells) =
     if loopCheck (CellContainer cells) then
         ( cells, FeLoop )
@@ -312,7 +320,7 @@ runCellsFully (CellContainer cells) =
         ( CellContainer cells, FeOk )
 
 
-evalCell : CellContainer id -> Cell id -> Cell id
+evalCell : CellContainer id cc -> Cell id cc -> Cell id cc
 evalCell cells cell =
     let
         prog =
@@ -331,7 +339,7 @@ evalCell cells cell =
 
 {-| should eval all cells, resulting in an updated array.
 -}
-evalCellsOnce : CellContainer id -> CellContainer id
+evalCellsOnce : CellContainer id cc -> CellContainer id cc
 evalCellsOnce initcells =
     let
         unevaledCells =
@@ -340,19 +348,19 @@ evalCellsOnce initcells =
     initcells.map (evalCell unevaledCells) unevaledCells
 
 
-type PRes id
-    = PrOk ( NameSpace (CellState id), CellState id, Term (CellState id) )
-    | PrPause (CellState id)
+type PRes id cc
+    = PrOk ( NameSpace (CellState id cc), CellState id cc, Term (CellState id cc) )
+    | PrPause (CellState id cc)
     | PrErr String
 
 
 {-| function type to pass to evalArgsSideEffector
 -}
-type alias PSideEffectorFn id =
-    NameSpace (CellState id) -> CellState id -> List (Term (CellState id)) -> PRes id
+type alias PSideEffectorFn id cc =
+    NameSpace (CellState id cc) -> CellState id cc -> List (Term (CellState id cc)) -> PRes id cc
 
 
-runCellBody : EvalBodyStep (CellState id) -> RunState id
+runCellBody : EvalBodyStep (CellState id cc) -> RunState id cc
 runCellBody ebs =
     case ebs of
         EbError e ->
@@ -377,7 +385,7 @@ runCellBody ebs =
 
 {-| just like the regular evalArgsSideEffector, except checks for PrPause from the fn.
 -}
-evalArgsPSideEffector : PSideEffectorFn id -> SideEffector (CellState id)
+evalArgsPSideEffector : PSideEffectorFn id cc -> SideEffector (CellState id cc)
 evalArgsPSideEffector fn =
     \step ->
         case step of
@@ -419,7 +427,7 @@ evalArgsPSideEffector fn =
                 step
 
 
-cellVal : PSideEffectorFn id
+cellVal : PSideEffectorFn id cc
 cellVal ns (CellState state) args =
     case args of
         [ TNumber x, TNumber y ] ->
