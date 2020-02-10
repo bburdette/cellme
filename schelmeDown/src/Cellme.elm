@@ -15,12 +15,12 @@ import StateSet exposing (setEvalBodyStepState)
 -}
 type CellContainer id cc
     = CellContainer
-        { cc
-            | getCell : id -> CellContainer id cc -> Maybe (Cell id cc)
-            , map : (Cell id cc -> Cell id cc) -> CellContainer id cc -> CellContainer id cc
-            , has : (Cell id cc -> Bool) -> CellContainer id cc -> Bool
+        { getCell : id -> CellContainer id cc -> Maybe (Cell id cc)
+        , map : (Cell id cc -> Cell id cc) -> CellContainer id cc -> CellContainer id cc
+        , has : (Cell id cc -> Bool) -> CellContainer id cc -> Bool
+        , cells : cc
 
-            -- , setCell : id -> Cell id cc -> Result String (CellContainer id)
+        -- , setCell : id -> Cell id cc -> Result String (CellContainer id)
         }
 
 
@@ -34,32 +34,50 @@ type CellContainer id cc
 
 
 type MyCellArray
-    = MyCellArray (CellContainer ( Int, Int ) { cells : Array (Array (Cell ( Int, Int ) MyCellArray)) })
+    = MyCellArray (Array (Array (Cell ( Int, Int ) MyCellArray)))
 
 
-myCellArray : MyCellArray
+
+-- = MyCellArray (CellContainer ( Int, Int ) { cells : Array (Array (Cell ( Int, Int ) MyCellArray)) })
+
+
+myCellArray : CellContainer ( Int, Int ) MyCellArray
 myCellArray =
-    MyCellArray
-        (CellContainer
-            { getCell = \( xi, yi ) (CellContainer cells) -> Array.get yi cells.cells |> Maybe.andThen (Array.get xi)
-            , cells = Array.empty
-            , map =
-                \fun (CellContainer cells) ->
-                    MyCellArray
-                        (CellContainer
-                            { cells
-                                | cells =
-                                    cells.cells
-                                        |> Array.map
-                                            (\cellcolumn ->
-                                                cellcolumn
-                                                    |> Array.map fun
-                                            )
-                            }
-                        )
-            , has = \fun (CellContainer cells) -> arraysHas fun cells.cells
-            }
-        )
+    CellContainer
+        { getCell =
+            \( xi, yi ) (CellContainer cells) ->
+                let
+                    (MyCellArray mca) =
+                        cells.cells
+                in
+                Array.get yi mca |> Maybe.andThen (Array.get xi)
+        , cells = MyCellArray Array.empty
+        , map =
+            \fun (CellContainer cellz) ->
+                let
+                    (MyCellArray cells) =
+                        cellz.cells
+                in
+                CellContainer
+                    { cellz
+                        | cells =
+                            MyCellArray
+                                (cells
+                                    |> Array.map
+                                        (\cellcolumn ->
+                                            cellcolumn
+                                                |> Array.map fun
+                                        )
+                                )
+                    }
+        , has =
+            \fun (CellContainer cells) ->
+                let
+                    (MyCellArray mca) =
+                        cells.cells
+                in
+                arraysHas fun mca
+        }
 
 
 
