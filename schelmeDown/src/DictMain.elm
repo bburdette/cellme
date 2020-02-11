@@ -1,4 +1,4 @@
-module Main exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
+module DictMain exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
 
 import Array exposing (Array)
 import ArrayCellme exposing (MyCell, MyCellArray(..), getMca, mkMca, myCellArray)
@@ -8,6 +8,7 @@ import Browser.Events as BE
 import Browser.Navigation as BN
 import Cellme exposing (..)
 import Dict exposing (Dict)
+import DictCellme
 import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, padding, paddingXY, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
 import Element.Background as BD
 import Element.Border as Border
