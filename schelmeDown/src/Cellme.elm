@@ -15,9 +15,11 @@ import StateSet exposing (setEvalBodyStepState)
 -}
 type CellContainer id cc
     = CellContainer
-        { getCell : id -> CellContainer id cc -> Maybe (Cell id cc)
-        , map : (Cell id cc -> Cell id cc) -> CellContainer id cc -> CellContainer id cc
-        , has : (Cell id cc -> Bool) -> CellContainer id cc -> Bool
+        { getCell : id -> CellContainer id cc -> Maybe (Cell id (CellState id cc))
+        , map : (Cell id (CellState id cc) -> Cell id (CellState id cc)) -> CellContainer id cc -> CellContainer id cc
+        , has : (Cell id (CellState id cc) -> Bool) -> CellContainer id cc -> Bool
+        , makeId : List (Term (CellState id cc)) -> Result String id
+        , showId : id -> String
         , cells : cc
 
         -- , setCell : id -> Cell id cc -> Result String (CellContainer id)
@@ -34,7 +36,7 @@ type CellContainer id cc
 
 
 type MyCellArray
-    = MyCellArray (Array (Array (Cell ( Int, Int ) MyCellArray)))
+    = MyCellArray (Array (Array (Cell ( Int, Int ) (CellState ( Int, Int ) MyCellArray))))
 
 
 
@@ -77,6 +79,23 @@ myCellArray =
                         cells.cells
                 in
                 arraysHas fun mca
+        , makeId =
+            \args ->
+                case args of
+                    [ TNumber x, TNumber y ] ->
+                        let
+                            xi =
+                                round x
+
+                            yi =
+                                round y
+                        in
+                        Ok
+                            ( xi, yi )
+
+                    _ ->
+                        Err (String.concat ("cv args should be 2 numbers!  " :: List.map showTerm args))
+        , showId = \( xi, yi ) -> String.concat [ "(", String.fromInt xi, ", ", String.fromInt yi, ")" ]
         }
 
 
@@ -89,7 +108,7 @@ myCellArray =
 type CellState id cc
     = CellState
         { cells : CellContainer id cc
-        , cellstatus : CellStatus
+        , cellstatus : CellStatus id
         }
 
 
@@ -100,9 +119,9 @@ type alias Cell id cs =
     }
 
 
-type CellStatus
+type CellStatus id
     = AllGood
-    | Blocked Int Int
+    | Blocked id
 
 
 type RunState id cs
@@ -125,24 +144,30 @@ cellme =
 compileCells : CellContainer id cc -> CellContainer id cc
 compileCells cells =
     let
+        (CellContainer cellc) =
+            cells
+
         compileCell =
             \cell -> { cell | prog = Run.compile cell.code }
     in
-    cells.map compileCell cells
+    cellc.map compileCell cells
 
 
 clearCells : CellContainer id cc -> CellContainer id cc
 clearCells cells =
     let
+        (CellContainer cellc) =
+            cells
+
         clearCell =
             \cell -> { cell | runstate = RsUnevaled }
     in
-    cells.map clearCell cells
+    cellc.map clearCell cells
 
 
 {-| run cell from the start.
 -}
-runCell : CellContainer id cc -> Cell id cc -> Cell id cc
+runCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellState id cc)
 runCell cells cell =
     case cell.prog of
         Err _ ->
@@ -157,7 +182,7 @@ runCell cells cell =
 
 {-| continue running the cell.
 -}
-continueCell : CellContainer id cc -> Cell id cc -> Cell id cc
+continueCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellState id cc)
 continueCell cells cell =
     case cell.prog of
         Err _ ->
@@ -233,7 +258,7 @@ arrayFirst condf array =
 
 
 compileError : CellContainer id cc -> Bool
-compileError cells =
+compileError (CellContainer cells) =
     cells.has
         (\cell ->
             case cell.prog of
@@ -243,18 +268,22 @@ compileError cells =
                 _ ->
                     False
         )
-        cells.cells
+        (CellContainer cells)
 
 
-isLoopedCell : CellContainer id cc -> List id -> Cell id cc -> Maybe (List id)
-isLoopedCell cells loop cell =
+isLoopedCell : CellContainer id cc -> List id -> Cell id (CellState id cc) -> Maybe (List id)
+isLoopedCell cellc loop cell =
+    let
+        (CellContainer cells) =
+            cellc
+    in
     case cell.runstate of
         RsBlocked _ id ->
             if List.member id loop then
                 Just loop
 
             else
-                cells.getCell cells id |> Maybe.andThen (isLoopedCell cells (id :: loop))
+                cells.getCell id cellc |> Maybe.andThen (isLoopedCell cellc (id :: loop))
 
         RsUnevaled ->
             Nothing
@@ -277,7 +306,11 @@ maybeIsJust mba =
 
 
 errorCheck : CellContainer id cc -> Bool
-errorCheck cells =
+errorCheck cellc =
+    let
+        (CellContainer cells) =
+            cellc
+    in
     cells.has
         (\cell ->
             case cell.runstate of
@@ -287,12 +320,16 @@ errorCheck cells =
                 _ ->
                     False
         )
-        cells.cells
+        cellc
 
 
 loopCheck : CellContainer id cc -> Bool
-loopCheck cells =
-    cells.has (\cell -> isLoopedCell cells [] cell |> maybeIsJust) cells.cells
+loopCheck cellc =
+    let
+        (CellContainer cells) =
+            cellc
+    in
+    cells.has (\cell -> isLoopedCell cellc [] cell |> maybeIsJust) cellc
 
 
 {-| should eval all cells, resulting in an updated array and result type.
@@ -315,12 +352,16 @@ evalCellsFully (CellContainer initcells) =
 
 
 runCellsFully : CellContainer id cc -> ( CellContainer id cc, FullEvalResult )
-runCellsFully (CellContainer cells) =
-    if loopCheck (CellContainer cells) then
-        ( cells, FeLoop )
+runCellsFully cellc =
+    let
+        (CellContainer cells) =
+            cellc
+    in
+    if loopCheck cellc then
+        ( cellc, FeLoop )
 
-    else if errorCheck (CellContainer cells) then
-        ( cells, FeEvalError )
+    else if errorCheck cellc then
+        ( cellc, FeEvalError )
 
     else if
         cells.has
@@ -338,15 +379,15 @@ runCellsFully (CellContainer cells) =
                     RsOk _ ->
                         False
             )
-            (CellContainer cells)
+            cellc
     then
-        runCellsFully (cells.map (continueCell (CellContainer cells)) cells.cells)
+        runCellsFully (cells.map (continueCell cellc) cellc)
 
     else
-        ( CellContainer cells, FeOk )
+        ( cellc, FeOk )
 
 
-evalCell : CellContainer id cc -> Cell id cc -> Cell id cc
+evalCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellState id cc)
 evalCell cells cell =
     let
         prog =
@@ -366,10 +407,10 @@ evalCell cells cell =
 {-| should eval all cells, resulting in an updated array.
 -}
 evalCellsOnce : CellContainer id cc -> CellContainer id cc
-evalCellsOnce initcells =
+evalCellsOnce (CellContainer initcells) =
     let
         unevaledCells =
-            initcells
+            CellContainer initcells
     in
     initcells.map (evalCell unevaledCells) unevaledCells
 
@@ -386,7 +427,7 @@ type alias PSideEffectorFn id cc =
     NameSpace (CellState id cc) -> CellState id cc -> List (Term (CellState id cc)) -> PRes id cc
 
 
-runCellBody : EvalBodyStep (CellState id cc) -> RunState id cc
+runCellBody : EvalBodyStep (CellState id cc) -> RunState id (CellState id cc)
 runCellBody ebs =
     case ebs of
         EbError e ->
@@ -402,8 +443,8 @@ runCellBody ebs =
                         AllGood ->
                             runCellBody (evalBody ebs)
 
-                        Blocked xi yi ->
-                            RsBlocked ebs xi yi
+                        Blocked id ->
+                            RsBlocked ebs id
 
                 Nothing ->
                     RsErr "error - no step state"
@@ -455,33 +496,29 @@ evalArgsPSideEffector fn =
 
 cellVal : PSideEffectorFn id cc
 cellVal ns (CellState state) args =
-    case args of
-        [ TNumber x, TNumber y ] ->
-            let
-                xi =
-                    round x
-
-                yi =
-                    round y
-            in
-            Array.get yi state.cells
-                |> Maybe.andThen (Array.get xi)
+    let
+        (CellContainer cellc) =
+            state.cells
+    in
+    case cellc.makeId args of
+        Ok id ->
+            cellc.getCell id state.cells
                 |> Maybe.map
                     (\cell ->
                         case cell.runstate of
                             RsBlocked _ _ ->
-                                PrPause <| CellState { state | cellstatus = Blocked xi yi }
+                                PrPause <| CellState { state | cellstatus = Blocked id }
 
                             RsErr _ ->
-                                PrErr <| "Blocked on error in : " ++ String.fromInt xi ++ ", " ++ String.fromInt yi
+                                PrErr <| "Blocked on error in : " ++ cellc.showId id
 
                             RsUnevaled ->
-                                PrPause <| CellState { state | cellstatus = Blocked xi yi }
+                                PrPause <| CellState { state | cellstatus = Blocked id }
 
                             RsOk val ->
                                 PrOk ( ns, CellState { state | cellstatus = AllGood }, val )
                     )
-                |> Maybe.withDefault (PrErr <| "cell not found: " ++ String.fromInt xi ++ ", " ++ String.fromInt yi)
+                |> Maybe.withDefault (PrErr <| "cell not found: " ++ cellc.showId id)
 
-        _ ->
-            PrErr (String.concat ("cv args should be 2 numbers!  " :: List.map showTerm args))
+        Err e ->
+            PrErr e
