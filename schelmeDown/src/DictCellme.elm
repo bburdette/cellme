@@ -1,4 +1,4 @@
-module DictCellme exposing (CellDict(..), DictCell, getMca, listHas, mkCc, myCellDict)
+module DictCellme exposing (CellDict(..), DictCell, getCd, listHas, mkCc, myCellDict)
 
 import Cellme exposing (Cell, CellContainer(..), CellState)
 import Dict exposing (Dict)
@@ -23,8 +23,8 @@ mkCc mca =
     CellContainer { cc | cells = mca }
 
 
-getMca : CellContainer String CellDict -> CellDict
-getMca (CellContainer cc) =
+getCd : CellContainer String CellDict -> CellDict
+getCd (CellContainer cc) =
     cc.cells
 
 
