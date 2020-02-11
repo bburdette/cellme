@@ -1,6 +1,5 @@
-module Cellme exposing (Cell, CellState(..), CellStatus(..), FullEvalResult(..), PRes(..), PSideEffectorFn, RunState(..), arrayFirst, arrayHas, cellVal, cellme, compileCells, compileError, continueCell, evalArgsPSideEffector, evalCell, evalCellsFully, evalCellsOnce, isLoopedCell, loopCheck, maybeIsJust, runCell, runCellBody)
+module Cellme exposing (Cell, CellContainer(..), CellState(..), CellStatus(..), FullEvalResult(..), PRes(..), PSideEffectorFn, RunState(..), cellVal, cellme, compileCells, compileError, continueCell, evalArgsPSideEffector, evalCell, evalCellsFully, evalCellsOnce, isLoopedCell, loopCheck, maybeIsJust, runCell, runCellBody)
 
-import Array exposing (Array)
 import Dict exposing (Dict)
 import Eval exposing (evalBody, evalTerm, evalTerms)
 import EvalStep exposing (EvalBodyStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
@@ -16,6 +15,7 @@ import StateSet exposing (setEvalBodyStepState)
 type CellContainer id cc
     = CellContainer
         { getCell : id -> CellContainer id cc -> Maybe (Cell id (CellState id cc))
+        , setCell : id -> Cell id (CellState id cc) -> CellContainer id cc -> Result String (CellContainer id cc)
         , map : (Cell id (CellState id cc) -> Cell id (CellState id cc)) -> CellContainer id cc -> CellContainer id cc
         , has : (Cell id (CellState id cc) -> Bool) -> CellContainer id cc -> Bool
         , makeId : List (Term (CellState id cc)) -> Result String id
@@ -33,73 +33,6 @@ type CellContainer id cc
 --     , map : (Cell ( Int, Int ) -> Cell ( Int, Int )) -> CellContainer CellArray -> CellContainer CellArray
 --     , has : (Cell ( Int, Int ) -> Bool) -> CellContainer CellArray -> Bool
 --     }
-
-
-type MyCellArray
-    = MyCellArray (Array (Array (Cell ( Int, Int ) (CellState ( Int, Int ) MyCellArray))))
-
-
-
--- = MyCellArray (CellContainer ( Int, Int ) { cells : Array (Array (Cell ( Int, Int ) MyCellArray)) })
-
-
-myCellArray : CellContainer ( Int, Int ) MyCellArray
-myCellArray =
-    CellContainer
-        { getCell =
-            \( xi, yi ) (CellContainer cells) ->
-                let
-                    (MyCellArray mca) =
-                        cells.cells
-                in
-                Array.get yi mca |> Maybe.andThen (Array.get xi)
-        , cells = MyCellArray Array.empty
-        , map =
-            \fun (CellContainer cellz) ->
-                let
-                    (MyCellArray cells) =
-                        cellz.cells
-                in
-                CellContainer
-                    { cellz
-                        | cells =
-                            MyCellArray
-                                (cells
-                                    |> Array.map
-                                        (\cellcolumn ->
-                                            cellcolumn
-                                                |> Array.map fun
-                                        )
-                                )
-                    }
-        , has =
-            \fun (CellContainer cells) ->
-                let
-                    (MyCellArray mca) =
-                        cells.cells
-                in
-                arraysHas fun mca
-        , makeId =
-            \args ->
-                case args of
-                    [ TNumber x, TNumber y ] ->
-                        let
-                            xi =
-                                round x
-
-                            yi =
-                                round y
-                        in
-                        Ok
-                            ( xi, yi )
-
-                    _ ->
-                        Err (String.concat ("cv args should be 2 numbers!  " :: List.map showTerm args))
-        , showId = \( xi, yi ) -> String.concat [ "(", String.fromInt xi, ", ", String.fromInt yi, ")" ]
-        }
-
-
-
 -- , cells = Array (Array (Cell ( Int, Int )))
 -- (Int, Int) ->  Array (Array Cell) -> Int -> Int -> Maybe Cell
 -- getCell icells xi yi =
@@ -204,57 +137,6 @@ type FullEvalResult
     | FeLoop
     | FeEvalError
     | FeCompileError
-
-
-arrayHas : (a -> Bool) -> Array a -> Bool
-arrayHas condf array =
-    let
-        arrayHasHelper : Int -> Bool
-        arrayHasHelper idx =
-            case
-                Array.get idx array
-                    |> Maybe.map condf
-            of
-                Nothing ->
-                    False
-
-                Just b ->
-                    if b then
-                        True
-
-                    else
-                        arrayHasHelper (idx + 1)
-    in
-    arrayHasHelper 0
-
-
-arraysHas : (a -> Bool) -> Array (Array a) -> Bool
-arraysHas condf arrays =
-    arrays
-        |> arrayHas
-            (\cc ->
-                cc
-                    |> arrayHas condf
-            )
-
-
-arrayFirst : (a -> Maybe b) -> Array a -> Maybe b
-arrayFirst condf array =
-    let
-        arrayFirstHelper : Int -> Maybe b
-        arrayFirstHelper idx =
-            Array.get idx array
-                |> Maybe.andThen
-                    (\a ->
-                        case condf a of
-                            Nothing ->
-                                arrayFirstHelper (idx + 1)
-
-                            Just b ->
-                                Just b
-                    )
-    in
-    arrayFirstHelper 0
 
 
 compileError : CellContainer id cc -> Bool

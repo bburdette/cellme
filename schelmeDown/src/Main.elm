@@ -1,6 +1,7 @@
 module Main exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
 
 import Array exposing (Array)
+import ArrayCellme exposing (MyCell, MyCellArray(..), getMca, mkMca, myCellArray)
 import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
@@ -28,26 +29,37 @@ type Msg
 
 
 type alias Model =
-    { elts : Array (Array Cell) }
+    { elts : MyCellArray }
 
 
-initelts : Array (Array Cell)
+initelts : MyCellArray
 initelts =
-    Array.map
-        (Array.map
-            (\s ->
-                { code = s
-                , prog = Err ""
-                , runstate = RsUnevaled
-                }
-            )
-        )
-    <|
-        Array.fromList
-            [ Array.fromList [ "1", "7", "8" ]
-            , Array.fromList [ "2", "5", "6" ]
-            , Array.fromList [ "9", "(+ (cv 1 0) (cv 1 1))", "0" ]
-            ]
+    let
+        ca =
+            Array.map
+                (Array.map
+                    (\s ->
+                        { code = s
+                        , prog = Err ""
+                        , runstate = RsUnevaled
+                        }
+                    )
+                )
+            <|
+                Array.fromList
+                    [ Array.fromList [ "1", "7", "8" ]
+                    , Array.fromList [ "2", "5", "6" ]
+                    , Array.fromList [ "9", "(+ (cv 1 0) (cv 1 1))", "0" ]
+                    ]
+
+        (CellContainer myc) =
+            myCellArray
+    in
+    MyCellArray ca
+
+
+
+-- CellContainer { myc | cells = ca }
 
 
 eview : Model -> Element Msg
@@ -86,8 +98,11 @@ eview model =
                                 |> Maybe.withDefault (text "err")
                 }
 
+        (MyCellArray mca) =
+            model.elts
+
         rl =
-            Array.get 0 model.elts
+            Array.get 0 mca
                 |> Maybe.map Array.length
                 |> Maybe.withDefault 0
     in
@@ -120,15 +135,19 @@ eview model =
             ]
         , indexedTable
             [ width fill, height fill ]
-            { data = Array.toList model.elts
+            { data = Array.toList mca
             , columns =
                 List.map colf (List.range 0 rl)
             }
         ]
 
 
-viewCell : Int -> Int -> Cell -> Element Msg
+viewCell : Int -> Int -> MyCell -> Element Msg
 viewCell xi yi cell =
+    let
+        (CellContainer mycc) =
+            myCellArray
+    in
     column [ width fill ]
         [ EI.text [ width fill ]
             { onChange = \v -> CellVal xi yi v
@@ -147,8 +166,8 @@ viewCell xi yi cell =
                 RsUnevaled ->
                     text <| "unevaled"
 
-                RsBlocked _ xib yib ->
-                    text <| "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
+                RsBlocked _ id ->
+                    text <| "blocked on cell: " ++ mycc.showId id
         ]
 
 
@@ -161,7 +180,7 @@ view model =
     }
 
 
-defCell : String -> Cell
+defCell : String -> MyCell
 defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
@@ -173,27 +192,32 @@ update msg model =
             ( model, Cmd.none )
 
         CellVal xi yi val ->
+            let
+                (MyCellArray mca) =
+                    model.elts
+            in
             ( { model
                 | elts =
-                    Array.get yi model.elts
+                    Array.get yi mca
                         |> Maybe.map
                             (\rowarray ->
-                                Array.set yi (Array.set xi (defCell val) rowarray) model.elts
+                                Array.set yi (Array.set xi (defCell val) rowarray) mca
                             )
+                        |> Maybe.map MyCellArray
                         |> Maybe.withDefault model.elts
               }
             , Cmd.none
             )
 
         EvalButton ->
-            ( { model | elts = evalCellsOnce model.elts }, Cmd.none )
+            ( { model | elts = getMca <| evalCellsOnce (mkMca model.elts) }, Cmd.none )
 
         RunButton ->
             let
                 ( cells, result ) =
-                    evalCellsFully model.elts
+                    evalCellsFully (mkMca model.elts)
             in
-            ( { model | elts = cells }, Cmd.none )
+            ( { model | elts = getMca cells }, Cmd.none )
 
 
 main : Platform.Program () Model Msg
