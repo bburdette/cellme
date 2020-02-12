@@ -1,11 +1,11 @@
-module Main exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
+module DictMain exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
 
-import Array exposing (Array)
 import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
 import Browser.Navigation as BN
-import Cellme exposing (..)
+import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
+import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCc, getCd, mkCc)
 import Dict exposing (Dict)
 import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, padding, paddingXY, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
 import Element.Background as BD
@@ -22,74 +22,41 @@ import Toop as T
 
 type Msg
     = Noop
-    | CellVal Int Int String
+    | CellVal String String
     | EvalButton
     | RunButton
 
 
 type alias Model =
-    { elts : Array (Array Cell) }
+    { elts : CellDict }
 
 
-initelts : Array (Array Cell)
+initelts : CellDict
 initelts =
-    Array.map
-        (Array.map
-            (\s ->
-                { code = s
-                , prog = Err ""
-                , runstate = RsUnevaled
-                }
-            )
-        )
-    <|
-        Array.fromList
-            [ Array.fromList [ "1", "7", "8" ]
-            , Array.fromList [ "2", "5", "6" ]
-            , Array.fromList [ "9", "(+ (cv 1 0) (cv 1 1))", "0" ]
+    let
+        cd =
+            [ ( "millimeters", "15" )
+            , ( "inches", "(/ (cv \"millimeters\") 25.4)" )
             ]
+                |> List.map
+                    (\( k, s ) ->
+                        ( k
+                        , { code = s
+                          , prog = Err ""
+                          , runstate = RsUnevaled
+                          }
+                        )
+                    )
+                |> Dict.fromList
+    in
+    CellDict cd
 
 
 eview : Model -> Element Msg
 eview model =
     let
-        colf =
-            \colidx ->
-                let
-                    ci =
-                        colidx - 1
-                in
-                { header =
-                    if colidx == 0 then
-                        column [ Font.bold ]
-                            [ text "x:"
-                            , el [] <| text "y"
-                            ]
-
-                    else
-                        text (String.fromInt ci)
-                , width =
-                    if colidx == 0 then
-                        shrink
-
-                    else
-                        fill
-                , view =
-                    \rowidx array ->
-                        if colidx == 0 then
-                            text (String.fromInt rowidx)
-
-                        else
-                            Array.get ci array
-                                |> Maybe.map
-                                    (viewCell ci rowidx)
-                                |> Maybe.withDefault (text "err")
-                }
-
-        rl =
-            Array.get 0 model.elts
-                |> Maybe.map Array.length
-                |> Maybe.withDefault 0
+        (CellDict mca) =
+            model.elts
     in
     column [ width fill, height fill, spacing 5, padding 5 ]
         [ newTabLink []
@@ -118,23 +85,38 @@ eview model =
                 , label = text "run"
                 }
             ]
-        , indexedTable
-            [ width fill, height fill ]
-            { data = Array.toList model.elts
+        , table []
+            { data = Dict.toList mca
             , columns =
-                List.map colf (List.range 0 rl)
+                [ { header = text "Name"
+                  , width = fill
+                  , view =
+                        \( k, v ) ->
+                            text k
+                  }
+                , { header = text "Code"
+                  , width = fill
+                  , view =
+                        \( k, v ) ->
+                            viewCell k v
+                  }
+                ]
             }
         ]
 
 
-viewCell : Int -> Int -> Cell -> Element Msg
-viewCell xi yi cell =
+viewCell : String -> DictCell -> Element Msg
+viewCell key cell =
+    let
+        (CellContainer mycc) =
+            dictCc
+    in
     column [ width fill ]
         [ EI.text [ width fill ]
-            { onChange = \v -> CellVal xi yi v
+            { onChange = \v -> CellVal key v
             , text = cell.code
             , placeholder = Nothing
-            , label = EI.labelHidden ("cell" ++ String.fromInt xi ++ "," ++ String.fromInt yi)
+            , label = EI.labelHidden ("cell '" ++ key ++ "'")
             }
         , el [ width fill ] <|
             case cell.runstate of
@@ -147,8 +129,8 @@ viewCell xi yi cell =
                 RsUnevaled ->
                     text <| "unevaled"
 
-                RsBlocked _ xib yib ->
-                    text <| "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
+                RsBlocked _ id ->
+                    text <| "blocked on cell: " ++ mycc.showId id
         ]
 
 
@@ -161,7 +143,7 @@ view model =
     }
 
 
-defCell : String -> Cell
+defCell : String -> DictCell
 defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
@@ -172,28 +154,28 @@ update msg model =
         Noop ->
             ( model, Cmd.none )
 
-        CellVal xi yi val ->
+        CellVal key val ->
+            let
+                (CellDict mca) =
+                    model.elts
+            in
             ( { model
                 | elts =
-                    Array.get yi model.elts
-                        |> Maybe.map
-                            (\rowarray ->
-                                Array.set yi (Array.set xi (defCell val) rowarray) model.elts
-                            )
-                        |> Maybe.withDefault model.elts
+                    Dict.insert key (defCell val) mca
+                        |> CellDict
               }
             , Cmd.none
             )
 
         EvalButton ->
-            ( { model | elts = evalCellsOnce model.elts }, Cmd.none )
+            ( { model | elts = getCd <| evalCellsOnce (mkCc model.elts) }, Cmd.none )
 
         RunButton ->
             let
                 ( cells, result ) =
-                    evalCellsFully model.elts
+                    evalCellsFully (mkCc model.elts)
             in
-            ( { model | elts = cells }, Cmd.none )
+            ( { model | elts = getCd cells }, Cmd.none )
 
 
 main : Platform.Program () Model Msg
