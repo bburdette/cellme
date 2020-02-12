@@ -35,11 +35,7 @@ type alias Model =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
-    let
-        _ =
-            Debug.log "cells: " model.cells
-    in
-    { title = "dillonkearns/elm-markdown demo"
+    { title = "schelme markdown demo"
     , body =
         [ Element.layout [ Element.width Element.fill ]
             (Element.row [ Element.width Element.fill ]
@@ -102,6 +98,7 @@ blockCells blocks =
                                     (\name ->
                                         am
                                             |> Dict.get "schelmeCode"
+                                            |> Maybe.map (String.replace "/'" "\"")
                                             |> Maybe.andThen
                                                 (\schelme ->
                                                     Just ( name, defCell schelme )
@@ -396,24 +393,22 @@ markdownBody =
     """# Markdown Schelme Cells!
 
 <cell
-  name="a"
+  name="inches"
   schelmeCode="5"
 >
 </cell>
 
 <cell
-  name="b"
-  schelmeCode="5"
+  name="millimeters"
+  schelmeCode="(* (cv /'inches/') 25.4)"
 >
 </cell>
 
 <cell
-  name="c"
-  schelmeCode="5"
+  name="furlongs"
+  schelmeCode="(/ (cv /'inches/') (* 12 660))"
 >
 </cell>
-
-
 """
 
 
@@ -422,11 +417,20 @@ main =
     Browser.document
         { init =
             \flags ->
+                let
+                    cells =
+                        Debug.log "newcells"
+                            (markdownBody
+                                |> mdCells
+                                |> Result.withDefault (CellDict Dict.empty)
+                            )
+
+                    ( cc, result ) =
+                        evalCellsFully
+                            (mkCc cells)
+                in
                 ( { md = markdownBody
-                  , cells =
-                        markdownBody
-                            |> mdCells
-                            |> Result.withDefault (CellDict Dict.empty)
+                  , cells = Debug.log "evaled cells: " <| getCd cc
                   }
                 , Cmd.none
                 )
@@ -442,9 +446,11 @@ update msg model =
         OnMarkdownInput newMarkdown ->
             let
                 cells =
-                    newMarkdown
-                        |> mdCells
-                        |> Result.withDefault (CellDict Dict.empty)
+                    Debug.log "newcells"
+                        (newMarkdown
+                            |> mdCells
+                            |> Result.withDefault (CellDict Dict.empty)
+                        )
 
                 ( cc, result ) =
                     evalCellsFully
@@ -452,7 +458,7 @@ update msg model =
             in
             ( { model
                 | md = newMarkdown
-                , cells = getCd cc
+                , cells = Debug.log "evaled cells: " <| getCd cc
               }
             , Cmd.none
             )
