@@ -10,7 +10,7 @@ import StateGet exposing (getEvalBodyStepState)
 import StateSet exposing (setEvalBodyStepState)
 
 
-{-| the state that is used during cell eval.
+{-| faux typeclass for storing cells in 'cc' using key 'id'.
 -}
 type CellContainer id cc
     = CellContainer
@@ -21,30 +21,12 @@ type CellContainer id cc
         , makeId : List (Term (CellState id cc)) -> Result String id
         , showId : id -> String
         , cells : cc
-
-        -- , setCell : id -> Cell id cc -> Result String (CellContainer id)
         }
 
 
-
--- type alias CellArray =
---     { cells : Array (Array Int)
---     , getCell : ( Int, Int ) -> CellContainer CellArray -> Maybe (Cell ( Int, Int ))
---     , map : (Cell ( Int, Int ) -> Cell ( Int, Int )) -> CellContainer CellArray -> CellContainer CellArray
---     , has : (Cell ( Int, Int ) -> Bool) -> CellContainer CellArray -> Bool
---     }
--- , cells = Array (Array (Cell ( Int, Int )))
--- (Int, Int) ->  Array (Array Cell) -> Int -> Int -> Maybe Cell
--- getCell icells xi yi =
-
-
-type CellState id cc
-    = CellState
-        { cells : CellContainer id cc
-        , cellstatus : CellStatus id
-        }
-
-
+{-| a cell is a text-form schelme program,
+the compiled version of same, and the program's RunState.
+-}
 type alias Cell id cs =
     { code : String
     , prog : Result String (List (Term cs))
@@ -52,16 +34,30 @@ type alias Cell id cs =
     }
 
 
-type CellStatus id
-    = AllGood
-    | Blocked id
-
-
+{-| the possible run states for a cell program.
+-}
 type RunState id cs
     = RsBlocked (EvalBodyStep cs) id
     | RsErr String
     | RsUnevaled
     | RsOk (Term cs)
+
+
+{-| when a cell program runs, it has access to CellState, the state of all cells.
+-}
+type CellState id cc
+    = CellState
+        { cells : CellContainer id cc
+        , cellstatus : CellStatus id
+        }
+
+
+{-| cell status may indicate that a cell is blocked because of another cell that needs to
+finish its program.
+-}
+type CellStatus id
+    = AllGood
+    | Blocked id
 
 
 {-| the cell language is schelme plus 'cv'
@@ -74,6 +70,8 @@ cellme =
             (TSideEffector (evalArgsPSideEffector cellVal))
 
 
+{-| compile all cell programs.
+-}
 compileCells : CellContainer id cc -> CellContainer id cc
 compileCells cells =
     let
@@ -86,6 +84,8 @@ compileCells cells =
     cellc.map compileCell cells
 
 
+{-| reset all cell programs.
+-}
 clearCells : CellContainer id cc -> CellContainer id cc
 clearCells cells =
     let
@@ -98,7 +98,7 @@ clearCells cells =
     cellc.map clearCell cells
 
 
-{-| run cell from the start.
+{-| run a cell from the start.
 -}
 runCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellState id cc)
 runCell cells cell =
@@ -113,7 +113,7 @@ runCell cells cell =
             }
 
 
-{-| continue running the cell.
+{-| continue running a cell program.
 -}
 continueCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellState id cc)
 continueCell cells cell =
@@ -132,13 +132,8 @@ continueCell cells cell =
                     cell
 
 
-type FullEvalResult
-    = FeOk
-    | FeLoop
-    | FeEvalError
-    | FeCompileError
-
-
+{-| does any cell have a compile error?
+-}
 compileError : CellContainer id cc -> Bool
 compileError (CellContainer cells) =
     cells.has
@@ -153,6 +148,8 @@ compileError (CellContainer cells) =
         (CellContainer cells)
 
 
+{-| is any cell looped - ie a cv call depends on itself?
+-}
 isLoopedCell : CellContainer id cc -> List id -> Cell id (CellState id cc) -> Maybe (List id)
 isLoopedCell cellc loop cell =
     let
@@ -214,7 +211,16 @@ loopCheck cellc =
     cells.has (\cell -> isLoopedCell cellc [] cell |> maybeIsJust) cellc
 
 
-{-| should eval all cells, resulting in an updated array and result type.
+{-| the four possible outcomes of running all cell programs to completion.
+-}
+type FullEvalResult
+    = FeOk
+    | FeLoop
+    | FeEvalError
+    | FeCompileError
+
+
+{-| should eval all cells from the start, resulting in an updated array and result type.
 -}
 evalCellsFully : CellContainer id cc -> ( CellContainer id cc, FullEvalResult )
 evalCellsFully (CellContainer initcells) =
@@ -233,6 +239,8 @@ evalCellsFully (CellContainer initcells) =
             |> runCellsFully
 
 
+{-| run all cell programs to completion, without resetting first.
+-}
 runCellsFully : CellContainer id cc -> ( CellContainer id cc, FullEvalResult )
 runCellsFully cellc =
     let
@@ -269,6 +277,8 @@ runCellsFully cellc =
         ( cellc, FeOk )
 
 
+{-| reset the cell program, then run to completion (or blockage, anyway)
+-}
 evalCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellState id cc)
 evalCell cells cell =
     let
@@ -286,7 +296,7 @@ evalCell cells cell =
             }
 
 
-{-| should eval all cells, resulting in an updated array.
+{-| eval all cells, resulting in an updated array.
 -}
 evalCellsOnce : CellContainer id cc -> CellContainer id cc
 evalCellsOnce (CellContainer initcells) =
@@ -297,6 +307,8 @@ evalCellsOnce (CellContainer initcells) =
     initcells.map (evalCell unevaledCells) unevaledCells
 
 
+{-| possible results from the PSideEffectorFn (the 'cv' function)
+-}
 type PRes id cc
     = PrOk ( NameSpace (CellState id cc), CellState id cc, Term (CellState id cc) )
     | PrPause (CellState id cc)
@@ -309,6 +321,8 @@ type alias PSideEffectorFn id cc =
     NameSpace (CellState id cc) -> CellState id cc -> List (Term (CellState id cc)) -> PRes id cc
 
 
+{-| run the cell program to completion
+-}
 runCellBody : EvalBodyStep (CellState id cc) -> RunState id (CellState id cc)
 runCellBody ebs =
     case ebs of
@@ -376,6 +390,9 @@ evalArgsPSideEffector fn =
                 step
 
 
+{-| given a cell id, attempt to get the value of that cell from the CellState.
+'cv'
+-}
 cellVal : PSideEffectorFn id cc
 cellVal ns (CellState state) args =
     let
