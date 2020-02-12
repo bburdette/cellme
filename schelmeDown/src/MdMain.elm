@@ -19,6 +19,7 @@ import Markdown.Parser
 
 type Msg
     = OnMarkdownInput String
+    | OnSchelmeCodeChanged String String
 
 
 type alias Flags =
@@ -162,7 +163,12 @@ cellView renderedChildren name schelmeCode =
                 , Font.size 30
                 ]
                 (Element.text name)
-            , Element.text schelmeCode
+            , EI.text []
+                { onChange = OnSchelmeCodeChanged name
+                , placeholder = Nothing
+                , label = EI.labelHidden name
+                , text = schelmeCode
+                }
             ]
             :: renderedChildren
         )
@@ -357,7 +363,15 @@ main =
         }
 
 
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         OnMarkdownInput newMarkdown ->
             ( newMarkdown, Cmd.none )
+
+        OnSchelmeCodeChanged name string ->
+            let
+                _ =
+                    Debug.log name string
+            in
+            ( model, Cmd.none )
