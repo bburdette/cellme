@@ -7,7 +7,7 @@ import Show exposing (showTerm, showTerms)
 
 
 type CellDict
-    = CellDict (Dict String (Cell String (CellState String CellDict)))
+    = CellDict (Dict String DictCell)
 
 
 type alias DictCell =
@@ -78,7 +78,7 @@ dictCcr =
                     Ok s
 
                 _ ->
-                    Err (String.concat ("cv args should be 2 numbers!  " :: List.map showTerm args))
+                    Err (String.concat ("cv arg should be a string (cell name)!  " :: List.map showTerm args))
     , showId = identity
     }
 

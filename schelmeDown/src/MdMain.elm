@@ -35,6 +35,10 @@ type alias Model =
 
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
+    let
+        _ =
+            Debug.log "cells: " model.cells
+    in
     { title = "dillonkearns/elm-markdown demo"
     , body =
         [ Element.layout [ Element.width Element.fill ]
@@ -97,7 +101,7 @@ blockCells blocks =
                                 |> Maybe.andThen
                                     (\name ->
                                         am
-                                            |> Dict.get "schelme"
+                                            |> Dict.get "schelmeCode"
                                             |> Maybe.andThen
                                                 (\schelme ->
                                                     Just ( name, defCell schelme )
@@ -389,50 +393,43 @@ codeBlock details =
 
 markdownBody : String
 markdownBody =
-    """# Custom HTML Renderers
+    """# Markdown Schelme Cells!
 
 <cell
   name="a"
-  schelmeCode="(+ 'a' a)"
+  schelmeCode="5"
 >
 </cell>
 
-You just render it like this
-
-```
-<bio
-  name="Dillon Kearns"
-  photo="https://avatars2.githubusercontent.com/u/1384166"
-  twitter="dillontkearns"
+<cell
+  name="b"
+  schelmeCode="5"
 >
-Dillon really likes building things with Elm! Here are some links
+</cell>
 
-- [Articles](https://incrementalelm.com/articles)
-</bio>
-```
-
-And you get a custom view like this!
-
-<bio
-  name="Dillon Kearns"
-  photo="https://avatars2.githubusercontent.com/u/1384166"
-  twitter="dillontkearns"
+<cell
+  name="c"
+  schelmeCode="5"
 >
-Dillon really likes building things with Elm! Here are some links
+</cell>
 
-- [Articles](https://incrementalelm.com/articles)
-</bio>
 
-Note that these attributes are all optional. Try removing them and see what happens!
-Or you can add `github="dillonkearns"` and see that icon show up. Or try making a `<bio>` tag
-with your info!
 """
 
 
 main : Platform.Program Flags Model Msg
 main =
     Browser.document
-        { init = \flags -> ( { md = markdownBody, cells = CellDict Dict.empty }, Cmd.none )
+        { init =
+            \flags ->
+                ( { md = markdownBody
+                  , cells =
+                        markdownBody
+                            |> mdCells
+                            |> Result.withDefault (CellDict Dict.empty)
+                  }
+                , Cmd.none
+                )
         , view = view
         , update = update
         , subscriptions = \model -> Sub.none
@@ -443,7 +440,22 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         OnMarkdownInput newMarkdown ->
-            ( { model | md = newMarkdown }, Cmd.none )
+            let
+                cells =
+                    newMarkdown
+                        |> mdCells
+                        |> Result.withDefault (CellDict Dict.empty)
+
+                ( cc, result ) =
+                    evalCellsFully
+                        (mkCc cells)
+            in
+            ( { model
+                | md = newMarkdown
+                , cells = getCd cc
+              }
+            , Cmd.none
+            )
 
         OnSchelmeCodeChanged name string ->
             let
