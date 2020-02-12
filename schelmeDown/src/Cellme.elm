@@ -390,8 +390,8 @@ evalArgsPSideEffector fn =
                 step
 
 
-{-| given a cell id, attempt to get the value of that cell from the CellState.
-'cv'
+{-| the 'cv' function in our schelme script language.
+given a cell id, attempt to get the value of that cell from the CellState.
 -}
 cellVal : PSideEffectorFn id cc
 cellVal ns (CellState state) args =
