@@ -1,7 +1,7 @@
 module Main exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
 
 import Array exposing (Array)
-import ArrayCellme exposing (MyCell, MyCellArray(..), getMca, mkMca, myCellArray)
+import ArrayCellme exposing (CellArray(..), MyCell, cellArray, getMca, mkMca)
 import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
@@ -29,10 +29,10 @@ type Msg
 
 
 type alias Model =
-    { elts : MyCellArray }
+    { elts : CellArray }
 
 
-initelts : MyCellArray
+initelts : CellArray
 initelts =
     let
         ca =
@@ -53,9 +53,9 @@ initelts =
                     ]
 
         (CellContainer myc) =
-            myCellArray
+            cellArray
     in
-    MyCellArray ca
+    CellArray ca
 
 
 eview : Model -> Element Msg
@@ -94,7 +94,7 @@ eview model =
                                 |> Maybe.withDefault (text "err")
                 }
 
-        (MyCellArray mca) =
+        (CellArray mca) =
             model.elts
 
         rl =
@@ -142,7 +142,7 @@ viewCell : Int -> Int -> MyCell -> Element Msg
 viewCell xi yi cell =
     let
         (CellContainer mycc) =
-            myCellArray
+            cellArray
     in
     column [ width fill ]
         [ EI.text [ width fill ]
@@ -189,7 +189,7 @@ update msg model =
 
         CellVal xi yi val ->
             let
-                (MyCellArray mca) =
+                (CellArray mca) =
                     model.elts
             in
             ( { model
@@ -199,7 +199,7 @@ update msg model =
                             (\rowarray ->
                                 Array.set yi (Array.set xi (defCell val) rowarray) mca
                             )
-                        |> Maybe.map MyCellArray
+                        |> Maybe.map CellArray
                         |> Maybe.withDefault model.elts
               }
             , Cmd.none

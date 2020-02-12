@@ -1,4 +1,7 @@
-module ArrayCellme exposing (MyCell, MyCellArray(..), getMca, mkMca, myCellArray)
+module ArrayCellme exposing (CellArray(..), MyCell, cellArray, getMca, mkMca)
+
+{-| implementation of CellContainer for a double Array of cells - spreadsheet style.. (cv Int Int) -> Cell.
+-}
 
 import Array exposing (Array)
 import Cellme exposing (Cell, CellContainer(..), CellState)
@@ -6,42 +9,42 @@ import EvalStep exposing (Term(..))
 import Show exposing (showTerm, showTerms)
 
 
-type MyCellArray
-    = MyCellArray (Array (Array (Cell ( Int, Int ) (CellState ( Int, Int ) MyCellArray))))
+type CellArray
+    = CellArray (Array (Array (Cell ( Int, Int ) (CellState ( Int, Int ) CellArray))))
 
 
 type alias MyCell =
-    Cell ( Int, Int ) (CellState ( Int, Int ) MyCellArray)
+    Cell ( Int, Int ) (CellState ( Int, Int ) CellArray)
 
 
-mkMca : MyCellArray -> CellContainer ( Int, Int ) MyCellArray
+mkMca : CellArray -> CellContainer ( Int, Int ) CellArray
 mkMca mca =
     let
         (CellContainer cc) =
-            myCellArray
+            cellArray
     in
     CellContainer { cc | cells = mca }
 
 
-getMca : CellContainer ( Int, Int ) MyCellArray -> MyCellArray
+getMca : CellContainer ( Int, Int ) CellArray -> CellArray
 getMca (CellContainer cc) =
     cc.cells
 
 
-myCellArray : CellContainer ( Int, Int ) MyCellArray
-myCellArray =
+cellArray : CellContainer ( Int, Int ) CellArray
+cellArray =
     CellContainer
         { getCell =
             \( xi, yi ) (CellContainer cells) ->
                 let
-                    (MyCellArray mca) =
+                    (CellArray mca) =
                         cells.cells
                 in
                 Array.get yi mca |> Maybe.andThen (Array.get xi)
         , setCell =
             \( xi, yi ) cell (CellContainer cells) ->
                 let
-                    (MyCellArray mca) =
+                    (CellArray mca) =
                         cells.cells
                 in
                 Array.get yi mca
@@ -50,18 +53,18 @@ myCellArray =
                             Array.set yi (Array.set xi cell rowarray) mca
                         )
                     |> Result.fromMaybe ("invalid key: (" ++ String.fromInt xi ++ ", " ++ String.fromInt xi ++ ")")
-                    |> Result.map (\newcells -> CellContainer { cells | cells = MyCellArray newcells })
-        , cells = MyCellArray Array.empty
+                    |> Result.map (\newcells -> CellContainer { cells | cells = CellArray newcells })
+        , cells = CellArray Array.empty
         , map =
             \fun (CellContainer cellz) ->
                 let
-                    (MyCellArray cells) =
+                    (CellArray cells) =
                         cellz.cells
                 in
                 CellContainer
                     { cellz
                         | cells =
-                            MyCellArray
+                            CellArray
                                 (cells
                                     |> Array.map
                                         (\cellcolumn ->
@@ -73,7 +76,7 @@ myCellArray =
         , has =
             \fun (CellContainer cells) ->
                 let
-                    (MyCellArray mca) =
+                    (CellArray mca) =
                         cells.cells
                 in
                 arraysHas fun mca
