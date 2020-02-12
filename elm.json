@@ -1,28 +1,18 @@
 {
-    "type": "application",
-    "source-directories": [
-        "src"
+    "type": "package",
+    "name": "bburdette/cellme",
+    "summary": "schelme cells",
+    "license": "BSD-3-Clause",
+    "version": "1.0.0",
+    "exposed-modules": [
+        "Cellme.Cellme",
+        "Cellme.ArrayCellme",
+        "Cellme.DictCellme"
     ],
-    "elm-version": "0.19.0",
+    "elm-version": "0.19.0 <= v < 0.19.2",
     "dependencies": {
-        "direct": {
-            "bburdette/schelme": "2.0.0",
-            "bburdette/toop": "1.0.0",
-            "elm/browser": "1.0.1",
-            "elm/core": "1.0.2",
-            "elm/html": "1.0.0",
-            "mdgriffith/elm-ui": "1.1.0"
-        },
-        "indirect": {
-            "elm/json": "1.1.3",
-            "elm/parser": "1.1.0",
-            "elm/time": "1.0.0",
-            "elm/url": "1.0.0",
-            "elm/virtual-dom": "1.0.2"
-        }
+        "bburdette/schelme": "2.0.1 <= v < 3.0.0",
+        "elm/core": "1.0.0 <= v < 2.0.0"
     },
-    "test-dependencies": {
-        "direct": {},
-        "indirect": {}
-    }
+    "test-dependencies": {}
 }

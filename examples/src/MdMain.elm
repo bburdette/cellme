@@ -1,9 +1,9 @@
 module MdMain exposing (main)
 
 import Browser
-import Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
+import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
+import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCc, dictCcr, getCd, mkCc)
 import Dict exposing (Dict)
-import DictCellme exposing (CellDict(..), DictCell, dictCc, dictCcr, getCd, mkCc)
 import Element exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd

@@ -4,9 +4,9 @@ import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
 import Browser.Navigation as BN
-import Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
+import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
+import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCc, getCd, mkCc)
 import Dict exposing (Dict)
-import DictCellme exposing (CellDict(..), DictCell, getCd, mkCc, myCellDict)
 import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, padding, paddingXY, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
 import Element.Background as BD
 import Element.Border as Border
@@ -109,7 +109,7 @@ viewCell : String -> DictCell -> Element Msg
 viewCell key cell =
     let
         (CellContainer mycc) =
-            myCellDict
+            dictCc
     in
     column [ width fill ]
         [ EI.text [ width fill ]

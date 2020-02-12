@@ -1,11 +1,12 @@
-module Main exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
+module ArrayMain exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
 
 import Array exposing (Array)
 import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
 import Browser.Navigation as BN
-import Cellme exposing (..)
+import Cellme.ArrayCellme exposing (ArrayCell, CellArray(..), cellArray, getCa, mkCc)
+import Cellme.Cellme exposing (..)
 import Dict exposing (Dict)
 import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, padding, paddingXY, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
 import Element.Background as BD
@@ -28,26 +29,33 @@ type Msg
 
 
 type alias Model =
-    { elts : Array (Array Cell) }
+    { elts : CellArray }
 
 
-initelts : Array (Array Cell)
+initelts : CellArray
 initelts =
-    Array.map
-        (Array.map
-            (\s ->
-                { code = s
-                , prog = Err ""
-                , runstate = RsUnevaled
-                }
-            )
-        )
-    <|
-        Array.fromList
-            [ Array.fromList [ "1", "7", "8" ]
-            , Array.fromList [ "2", "5", "6" ]
-            , Array.fromList [ "9", "(+ (cv 1 0) (cv 1 1))", "0" ]
-            ]
+    let
+        ca =
+            Array.map
+                (Array.map
+                    (\s ->
+                        { code = s
+                        , prog = Err ""
+                        , runstate = RsUnevaled
+                        }
+                    )
+                )
+            <|
+                Array.fromList
+                    [ Array.fromList [ "1", "7", "8" ]
+                    , Array.fromList [ "2", "5", "6" ]
+                    , Array.fromList [ "9", "(+ (cv 1 0) (cv 1 1))", "0" ]
+                    ]
+
+        (CellContainer myc) =
+            cellArray
+    in
+    CellArray ca
 
 
 eview : Model -> Element Msg
@@ -86,8 +94,11 @@ eview model =
                                 |> Maybe.withDefault (text "err")
                 }
 
+        (CellArray mca) =
+            model.elts
+
         rl =
-            Array.get 0 model.elts
+            Array.get 0 mca
                 |> Maybe.map Array.length
                 |> Maybe.withDefault 0
     in
@@ -120,15 +131,19 @@ eview model =
             ]
         , indexedTable
             [ width fill, height fill ]
-            { data = Array.toList model.elts
+            { data = Array.toList mca
             , columns =
                 List.map colf (List.range 0 rl)
             }
         ]
 
 
-viewCell : Int -> Int -> Cell -> Element Msg
+viewCell : Int -> Int -> ArrayCell -> Element Msg
 viewCell xi yi cell =
+    let
+        (CellContainer mycc) =
+            cellArray
+    in
     column [ width fill ]
         [ EI.text [ width fill ]
             { onChange = \v -> CellVal xi yi v
@@ -147,8 +162,8 @@ viewCell xi yi cell =
                 RsUnevaled ->
                     text <| "unevaled"
 
-                RsBlocked _ xib yib ->
-                    text <| "blocked on cell (" ++ String.fromInt xib ++ ", " ++ String.fromInt yib ++ ")"
+                RsBlocked _ id ->
+                    text <| "blocked on cell: " ++ mycc.showId id
         ]
 
 
@@ -161,7 +176,7 @@ view model =
     }
 
 
-defCell : String -> Cell
+defCell : String -> ArrayCell
 defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
@@ -173,27 +188,32 @@ update msg model =
             ( model, Cmd.none )
 
         CellVal xi yi val ->
+            let
+                (CellArray mca) =
+                    model.elts
+            in
             ( { model
                 | elts =
-                    Array.get yi model.elts
+                    Array.get yi mca
                         |> Maybe.map
                             (\rowarray ->
-                                Array.set yi (Array.set xi (defCell val) rowarray) model.elts
+                                Array.set yi (Array.set xi (defCell val) rowarray) mca
                             )
+                        |> Maybe.map CellArray
                         |> Maybe.withDefault model.elts
               }
             , Cmd.none
             )
 
         EvalButton ->
-            ( { model | elts = evalCellsOnce model.elts }, Cmd.none )
+            ( { model | elts = getCa <| evalCellsOnce (mkCc model.elts) }, Cmd.none )
 
         RunButton ->
             let
                 ( cells, result ) =
-                    evalCellsFully model.elts
+                    evalCellsFully (mkCc model.elts)
             in
-            ( { model | elts = cells }, Cmd.none )
+            ( { model | elts = getCa cells }, Cmd.none )
 
 
 main : Platform.Program () Model Msg
