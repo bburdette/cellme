@@ -1,19 +1,28 @@
 module DictCellme exposing (CellDict(..), DictCell, dictCc, dictCcr, getCd, listHas, mkCc)
 
+{-| implementation of CellContainer for a Dict String Cell. (cv "name") -> Cell.
+-}
+
 import Cellme exposing (Cell, CellContainer(..), CellState)
 import Dict exposing (Dict)
 import EvalStep exposing (Term(..))
-import Show exposing (showTerm, showTerms)
+import Show exposing (showTerm)
 
 
+{-| CellDict type contains a Dict from String to Cell.
+-}
 type CellDict
     = CellDict (Dict String DictCell)
 
 
+{-| DictCell contains a program that has a CellDict as part of its state.
+-}
 type alias DictCell =
     Cell String (CellState String CellDict)
 
 
+{-| make CellContainer.
+-}
 mkCc : CellDict -> CellContainer String CellDict
 mkCc mca =
     let
@@ -23,16 +32,22 @@ mkCc mca =
     CellContainer { cc | cells = mca }
 
 
+{-| get CellDict from the CellContainer..
+-}
 getCd : CellContainer String CellDict -> CellDict
 getCd (CellContainer cc) =
     cc.cells
 
 
+{-| a CellDict CellContainer with an empty CellDict.
+-}
 dictCc : CellContainer String CellDict
 dictCc =
     CellContainer dictCcr
 
 
+{-| the record used to build a CellDict CellContainer faux-typeclass.
+-}
 dictCcr =
     { getCell =
         \key (CellContainer cells) ->
@@ -59,7 +74,7 @@ dictCcr =
                 { cellz
                     | cells =
                         CellDict
-                            (Dict.map (\k v -> fun v) cells)
+                            (Dict.map (\_ v -> fun v) cells)
                 }
     , has =
         \fun (CellContainer cells) ->
