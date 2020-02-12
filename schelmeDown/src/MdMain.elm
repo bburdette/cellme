@@ -3,7 +3,7 @@ module MdMain exposing (main)
 import Browser
 import Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
 import Dict exposing (Dict)
-import DictCellme exposing (CellDict(..), DictCell, getCd, mkCc, myCellDict)
+import DictCellme exposing (CellDict(..), DictCell, dictCc, dictCcr, getCd, mkCc)
 import Element exposing (Element)
 import Element.Background as EBk
 import Element.Border as EBd
@@ -12,9 +12,10 @@ import Element.Input as EI
 import Element.Region
 import Html exposing (Attribute, Html)
 import Html.Attributes
-import Markdown.Block exposing (Block, Inline, InlineStyle)
+import Markdown.Block exposing (Block(..), Inline, InlineStyle)
 import Markdown.Html
 import Markdown.Parser
+import Show exposing (showTerm, showTerms)
 
 
 type Msg
@@ -27,7 +28,9 @@ type alias Flags =
 
 
 type alias Model =
-    String
+    { md : String
+    , cells : CellDict
+    }
 
 
 view : Model -> { title : String, body : List (Html Msg) }
@@ -38,12 +41,12 @@ view model =
             (Element.row [ Element.width Element.fill ]
                 [ EI.multiline [ Element.width (Element.px 400) ]
                     { onChange = OnMarkdownInput
-                    , text = model
+                    , text = model.md
                     , placeholder = Nothing
                     , label = EI.labelHidden "Markdown input"
                     , spellcheck = False
                     }
-                , case markdownView model of
+                , case markdownView (mkRenderer model.cells) model.md of
                     Ok rendered ->
                         Element.column
                             [ Element.spacing 30
@@ -61,16 +64,63 @@ view model =
     }
 
 
-markdownView : String -> Result String (List (Element Msg))
-markdownView markdown =
+markdownView : Markdown.Parser.Renderer (Element Msg) -> String -> Result String (List (Element Msg))
+markdownView renderer markdown =
     markdown
         |> Markdown.Parser.parse
         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
         |> Result.andThen (Markdown.Parser.render renderer)
 
 
-renderer : Markdown.Parser.Renderer (Element Msg)
-renderer =
+mdCells : String -> Result String CellDict
+mdCells markdown =
+    markdown
+        |> Markdown.Parser.parse
+        |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
+        |> Result.map blockCells
+
+
+blockCells : List Block -> CellDict
+blockCells blocks =
+    blocks
+        |> List.filterMap
+            (\block ->
+                case block of
+                    Html tag attribs _ ->
+                        if tag == "cell" then
+                            let
+                                am =
+                                    Dict.fromList <| List.map (\trib -> ( trib.name, trib.value )) attribs
+                            in
+                            am
+                                |> Dict.get "name"
+                                |> Maybe.andThen
+                                    (\name ->
+                                        am
+                                            |> Dict.get "schelme"
+                                            |> Maybe.andThen
+                                                (\schelme ->
+                                                    Just ( name, defCell schelme )
+                                                )
+                                    )
+
+                        else
+                            Nothing
+
+                    _ ->
+                        Nothing
+            )
+        |> Dict.fromList
+        |> CellDict
+
+
+defCell : String -> DictCell
+defCell s =
+    { code = s, prog = Err "", runstate = RsErr "" }
+
+
+mkRenderer : CellDict -> Markdown.Parser.Renderer (Element Msg)
+mkRenderer cellDict =
     { heading = heading
     , raw =
         Element.paragraph
@@ -135,7 +185,7 @@ renderer =
                 |> Markdown.Html.withOptionalAttribute "dribbble"
             , Markdown.Html.tag "cell"
                 (\name schelmeCode renderedChildren ->
-                    cellView renderedChildren name schelmeCode
+                    cellView cellDict renderedChildren name schelmeCode
                 )
                 |> Markdown.Html.withAttribute "name"
                 |> Markdown.Html.withAttribute "schelmeCode"
@@ -143,8 +193,8 @@ renderer =
     }
 
 
-cellView : List (Element Msg) -> String -> String -> Element Msg
-cellView renderedChildren name schelmeCode =
+cellView : CellDict -> List (Element Msg) -> String -> String -> Element Msg
+cellView (CellDict cellDict) renderedChildren name schelmeCode =
     Element.column
         [ EBd.shadow
             { offset = ( 0.3, 0.3 )
@@ -167,11 +217,37 @@ cellView renderedChildren name schelmeCode =
                 { onChange = OnSchelmeCodeChanged name
                 , placeholder = Nothing
                 , label = EI.labelHidden name
-                , text = schelmeCode
+                , text =
+                    cellDict
+                        |> Dict.get name
+                        |> Maybe.map .code
+                        |> Maybe.withDefault "<err>"
                 }
+            , cellDict
+                |> Dict.get name
+                |> Maybe.map showRunState
+                |> Maybe.withDefault
+                    (Element.text "<reserr>")
             ]
             :: renderedChildren
         )
+
+
+showRunState : DictCell -> Element Msg
+showRunState cell =
+    Element.el [ Element.width Element.fill ] <|
+        case cell.runstate of
+            RsOk term ->
+                Element.text <| showTerm term
+
+            RsErr s ->
+                Element.el [ Font.color <| Element.rgb 1 0.1 0.1 ] <| Element.text <| "err: " ++ s
+
+            RsUnevaled ->
+                Element.text <| "unevaled"
+
+            RsBlocked _ id ->
+                Element.text <| "blocked on cell: " ++ dictCcr.showId id
 
 
 bioView : List (Element Msg) -> String -> String -> Maybe String -> Maybe String -> Maybe String -> Element Msg
@@ -356,7 +432,7 @@ with your info!
 main : Platform.Program Flags Model Msg
 main =
     Browser.document
-        { init = \flags -> ( markdownBody, Cmd.none )
+        { init = \flags -> ( { md = markdownBody, cells = CellDict Dict.empty }, Cmd.none )
         , view = view
         , update = update
         , subscriptions = \model -> Sub.none
@@ -367,11 +443,23 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         OnMarkdownInput newMarkdown ->
-            ( newMarkdown, Cmd.none )
+            ( { model | md = newMarkdown }, Cmd.none )
 
         OnSchelmeCodeChanged name string ->
             let
-                _ =
-                    Debug.log name string
+                (CellDict cd) =
+                    model.cells
+
+                ( cc, result ) =
+                    evalCellsFully
+                        (mkCc
+                            (Dict.insert name (defCell string) cd
+                                |> CellDict
+                            )
+                        )
             in
-            ( model, Cmd.none )
+            ( { model
+                | cells = getCd cc
+              }
+            , Cmd.none
+            )
