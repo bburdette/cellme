@@ -1,7 +1,7 @@
 module Main exposing (Model, Msg(..), eview, initelts, main, update, view, viewCell)
 
 import Array exposing (Array)
-import ArrayCellme exposing (CellArray(..), MyCell, cellArray, getMca, mkMca)
+import ArrayCellme exposing (ArrayCell, CellArray(..), cellArray, getCa, mkCc)
 import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
@@ -138,7 +138,7 @@ eview model =
         ]
 
 
-viewCell : Int -> Int -> MyCell -> Element Msg
+viewCell : Int -> Int -> ArrayCell -> Element Msg
 viewCell xi yi cell =
     let
         (CellContainer mycc) =
@@ -176,7 +176,7 @@ view model =
     }
 
 
-defCell : String -> MyCell
+defCell : String -> ArrayCell
 defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
@@ -206,14 +206,14 @@ update msg model =
             )
 
         EvalButton ->
-            ( { model | elts = getMca <| evalCellsOnce (mkMca model.elts) }, Cmd.none )
+            ( { model | elts = getCa <| evalCellsOnce (mkCc model.elts) }, Cmd.none )
 
         RunButton ->
             let
                 ( cells, result ) =
-                    evalCellsFully (mkMca model.elts)
+                    evalCellsFully (mkCc model.elts)
             in
-            ( { model | elts = getMca cells }, Cmd.none )
+            ( { model | elts = getCa cells }, Cmd.none )
 
 
 main : Platform.Program () Model Msg
