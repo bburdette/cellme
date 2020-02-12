@@ -230,6 +230,7 @@ icons twitter github dribbble =
         )
 
 
+avatarView : String -> Element Msg
 avatarView avatarUrl =
     Element.image [ Element.width Element.fill ]
         { src = avatarUrl, description = "Avatar image" }
@@ -237,6 +238,7 @@ avatarView avatarUrl =
             [ Element.width (Element.px 80) ]
 
 
+rawTextToId : String -> String
 rawTextToId rawText =
     rawText
         |> String.toLower
@@ -303,6 +305,7 @@ codeBlock details =
         (Element.text details.body)
 
 
+markdownBody : String
 markdownBody =
     """# Custom HTML Renderers
 
