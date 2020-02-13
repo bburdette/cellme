@@ -1,16 +1,16 @@
 module Cellme.ArrayCellme exposing
-    ( ArrayCell
-    , CellArray(..)
-    , cellArray
+    ( CellArray(..)
+    , ArrayCell
+    , arrayCcr
     , getCa
     , mkCc
     )
 
-{-| implementation of CellContainer for a double Array of cells - spreadsheet style.. (cv Int Int) -> Cell.
+{-| implementation of cellme for a 2D Array of cells - spreadsheet style.
 
-@docs ArrayCell
 @docs CellArray
-@docs cellArray
+@docs ArrayCell
+@docs arrayCcr
 @docs getCa
 @docs mkCc
 
@@ -28,7 +28,7 @@ type CellArray
     = CellArray (Array (Array ArrayCell))
 
 
-{-| a Cell that has a CellArray as part of its run state.
+{-| a Cell with a CellArray id and CellArray in its run state.
 -}
 type alias ArrayCell =
     Cell ( Int, Int ) (CellState ( Int, Int ) CellArray)
@@ -38,11 +38,7 @@ type alias ArrayCell =
 -}
 mkCc : CellArray -> CellContainer ( Int, Int ) CellArray
 mkCc mca =
-    let
-        (CellContainer cc) =
-            cellArray
-    in
-    CellContainer { cc | cells = mca }
+    CellContainer { arrayCcr | cells = mca }
 
 
 {-| get the CellArray from a CellContainer.
@@ -52,14 +48,7 @@ getCa (CellContainer cc) =
     cc.cells
 
 
-{-| make a CellContainer with an empty CellArray.
--}
-cellArray : CellContainer ( Int, Int ) CellArray
-cellArray =
-    CellContainer arrayCcr
-
-
-{-| a record with the required functions for the CellArray CellContainer faux-typeclass
+{-| a CcRecord with functions implemented for CellArray and ArrayCell.
 -}
 arrayCcr : CcRecord ( Int, Int ) CellArray
 arrayCcr =

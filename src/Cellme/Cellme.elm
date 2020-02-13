@@ -1,6 +1,6 @@
 module Cellme.Cellme exposing
-    ( CcRecord
-    , Cell
+    ( Cell
+    , CcRecord
     , CellContainer(..)
     , CellState(..)
     , CellStatus(..)
@@ -23,8 +23,8 @@ module Cellme.Cellme exposing
 
 {-| Cellme
 
-@docs CcRecord
 @docs Cell
+@docs CcRecord
 @docs CellContainer
 @docs CellState
 @docs CellStatus
@@ -46,23 +46,27 @@ module Cellme.Cellme exposing
 
 -}
 
-import Dict exposing (Dict)
-import Eval exposing (evalBody, evalTerm, evalTerms)
+import Dict
+import Eval exposing (evalBody, evalTerms)
 import EvalStep exposing (EvalBodyStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
-import Prelude exposing (BuiltInFn)
-import Run exposing (compile, runCount)
-import Show exposing (showTerm, showTerms)
+import Prelude
+import Run exposing (compile)
 import StateGet exposing (getEvalBodyStepState)
 import StateSet exposing (setEvalBodyStepState)
 
 
-{-| faux typeclass for storing cells in 'cc' using key 'id'.
+{-| a cell is a text-form schelme program,
+the compiled version of same, and the program's RunState.
 -}
-type CellContainer id cc
-    = CellContainer (CcRecord id cc)
+type alias Cell id cs =
+    { code : String
+    , prog : Result String (List (Term cs))
+    , runstate : RunState id cs
+    }
 
 
-{-| The record type for CellContainer
+{-| The record type for CellContainer - a CcRecord should contain an id type, a
+container type 'cc', and implementations of all these functions.
 -}
 type alias CcRecord id cc =
     { getCell : id -> CellContainer id cc -> Maybe (Cell id (CellState id cc))
@@ -75,14 +79,10 @@ type alias CcRecord id cc =
     }
 
 
-{-| a cell is a text-form schelme program,
-the compiled version of same, and the program's RunState.
+{-| a type that contains a CcRecord.
 -}
-type alias Cell id cs =
-    { code : String
-    , prog : Result String (List (Term cs))
-    , runstate : RunState id cs
-    }
+type CellContainer id cc
+    = CellContainer (CcRecord id cc)
 
 
 {-| the possible run states for a cell program.
@@ -149,7 +149,7 @@ clearCells cells =
     cellc.map clearCell cells
 
 
-{-| run a cell from the start.
+{-| run a cell from its current state to completion.
 -}
 runCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellState id cc)
 runCell cells cell =
@@ -262,7 +262,7 @@ loopCheck cellc =
     cells.has (\cell -> isLoopedCell cellc [] cell |> maybeIsJust) cellc
 
 
-{-| the four possible outcomes of running all cell programs to completion.
+{-| the possible outcomes of running all cell programs to completion.
 -}
 type FullEvalResult
     = FeOk
@@ -358,18 +358,19 @@ evalCellsOnce (CellContainer initcells) =
     initcells.map (evalCell unevaledCells) unevaledCells
 
 
-{-| possible results from the PSideEffectorFn (the 'cv' function)
+{-| The type signature of side effector functions in our cellme language.
+For now there's only one, 'cv'.
+-}
+type alias PSideEffectorFn id cc =
+    NameSpace (CellState id cc) -> CellState id cc -> List (Term (CellState id cc)) -> PRes id cc
+
+
+{-| possible results from a PSideEffectorFn
 -}
 type PRes id cc
     = PrOk ( NameSpace (CellState id cc), CellState id cc, Term (CellState id cc) )
     | PrPause (CellState id cc)
     | PrErr String
-
-
-{-| function type to pass to evalArgsSideEffector
--}
-type alias PSideEffectorFn id cc =
-    NameSpace (CellState id cc) -> CellState id cc -> List (Term (CellState id cc)) -> PRes id cc
 
 
 {-| run the cell program to completion

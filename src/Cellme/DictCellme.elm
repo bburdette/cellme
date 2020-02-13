@@ -1,17 +1,15 @@
 module Cellme.DictCellme exposing
     ( CellDict(..)
     , DictCell
-    , dictCc
     , dictCcr
     , getCd
     , mkCc
     )
 
-{-| implementation of CellContainer for a Dict String Cell. (cv "name") -> Cell.
+{-| implementation of cellme for a Dict of cells with String ids.
 
 @docs CellDict
 @docs DictCell
-@docs dictCc
 @docs dictCcr
 @docs getCd
 @docs mkCc
@@ -24,44 +22,33 @@ import EvalStep exposing (Term(..))
 import Show exposing (showTerm)
 
 
-{-| CellDict type contains a Dict from String to Cell.
+{-| a Dict from String to Cell.
 -}
 type CellDict
     = CellDict (Dict String DictCell)
 
 
-{-| DictCell contains a program that has a CellDict as part of its state.
+{-| a Cell specialized for CellDict.
 -}
 type alias DictCell =
     Cell String (CellState String CellDict)
 
 
-{-| make CellContainer.
+{-| make a CellContainer from a CellDict.
 -}
 mkCc : CellDict -> CellContainer String CellDict
 mkCc mca =
-    let
-        (CellContainer cc) =
-            dictCc
-    in
-    CellContainer { cc | cells = mca }
+    CellContainer { dictCcr | cells = mca }
 
 
-{-| get CellDict from the CellContainer..
+{-| get CellDict from a CellContainer.
 -}
 getCd : CellContainer String CellDict -> CellDict
 getCd (CellContainer cc) =
     cc.cells
 
 
-{-| a CellDict CellContainer with an empty CellDict.
--}
-dictCc : CellContainer String CellDict
-dictCc =
-    CellContainer dictCcr
-
-
-{-| the record used to build a CellDict CellContainer faux-typeclass.
+{-| a CcRecord with functions implemented for CellDict and DictCell.
 -}
 dictCcr : CcRecord String CellDict
 dictCcr =

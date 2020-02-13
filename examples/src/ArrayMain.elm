@@ -5,7 +5,7 @@ import Browser
 import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
 import Browser.Navigation as BN
-import Cellme.ArrayCellme exposing (ArrayCell, CellArray(..), cellArray, getCa, mkCc)
+import Cellme.ArrayCellme exposing (ArrayCell, CellArray(..), arrayCcr, getCa, mkCc)
 import Cellme.Cellme exposing (..)
 import Dict exposing (Dict)
 import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, padding, paddingXY, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
@@ -51,9 +51,6 @@ initelts =
                     , Array.fromList [ "2", "5", "6" ]
                     , Array.fromList [ "9", "(+ (cv 1 0) (cv 1 1))", "0" ]
                     ]
-
-        (CellContainer myc) =
-            cellArray
     in
     CellArray ca
 
@@ -140,10 +137,6 @@ eview model =
 
 viewCell : Int -> Int -> ArrayCell -> Element Msg
 viewCell xi yi cell =
-    let
-        (CellContainer mycc) =
-            cellArray
-    in
     column [ width fill ]
         [ EI.text [ width fill ]
             { onChange = \v -> CellVal xi yi v
@@ -163,7 +156,7 @@ viewCell xi yi cell =
                     text <| "unevaled"
 
                 RsBlocked _ id ->
-                    text <| "blocked on cell: " ++ mycc.showId id
+                    text <| "blocked on cell: " ++ arrayCcr.showId id
         ]
 
 

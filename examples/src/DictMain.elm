@@ -5,7 +5,7 @@ import Browser.Dom as BD exposing (Element, getElement)
 import Browser.Events as BE
 import Browser.Navigation as BN
 import Cellme.Cellme exposing (Cell, CellContainer(..), CellState, RunState(..), evalCellsFully, evalCellsOnce)
-import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCc, getCd, mkCc)
+import Cellme.DictCellme exposing (CellDict(..), DictCell, dictCcr, getCd, mkCc)
 import Dict exposing (Dict)
 import Element as E exposing (Element, centerX, column, el, fill, fillPortion, height, image, inFront, indexedTable, map, newTabLink, padding, paddingXY, paragraph, rgb, rgba, row, shrink, spacing, table, text, width)
 import Element.Background as BD
@@ -107,10 +107,6 @@ eview model =
 
 viewCell : String -> DictCell -> Element Msg
 viewCell key cell =
-    let
-        (CellContainer mycc) =
-            dictCc
-    in
     column [ width fill ]
         [ EI.text [ width fill ]
             { onChange = \v -> CellVal key v
@@ -130,7 +126,7 @@ viewCell key cell =
                     text <| "unevaled"
 
                 RsBlocked _ id ->
-                    text <| "blocked on cell: " ++ mycc.showId id
+                    text <| "blocked on cell: " ++ dictCcr.showId id
         ]
 
 
