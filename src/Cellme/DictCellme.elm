@@ -18,8 +18,8 @@ module Cellme.DictCellme exposing
 
 import Cellme.Cellme exposing (CcRecord, Cell, CellContainer(..), CellState)
 import Dict exposing (Dict)
-import EvalStep exposing (Term(..))
-import Show exposing (showTerm)
+import Schelme.EvalStep exposing (Term(..))
+import Schelme.Show exposing (showTerm)
 
 
 {-| a Dict from String to Cell.

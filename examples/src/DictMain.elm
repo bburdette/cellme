@@ -13,10 +13,10 @@ import Element.Border as Border
 import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
-import EvalStep exposing (NameSpace, Term(..))
-import Prelude exposing (BuiltInFn)
-import Run exposing (compile, runCount)
-import Show exposing (showTerm, showTerms)
+import Schelme.EvalStep exposing (NameSpace, Term(..))
+import Schelme.Prelude exposing (BuiltInFn)
+import Schelme.Run exposing (compile, runCount)
+import Schelme.Show exposing (showTerm, showTerms)
 import Toop as T
 
 

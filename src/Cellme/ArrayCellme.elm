@@ -18,8 +18,8 @@ module Cellme.ArrayCellme exposing
 
 import Array exposing (Array)
 import Cellme.Cellme exposing (CcRecord, Cell, CellContainer(..), CellState)
-import EvalStep exposing (Term(..))
-import Show exposing (showTerm, showTerms)
+import Schelme.EvalStep exposing (Term(..))
+import Schelme.Show exposing (showTerm, showTerms)
 
 
 {-| a 2D array of Cells.

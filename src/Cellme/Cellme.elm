@@ -47,12 +47,12 @@ module Cellme.Cellme exposing
 -}
 
 import Dict
-import Eval exposing (evalBody, evalTerms)
-import EvalStep exposing (EvalBodyStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
-import Prelude
-import Run exposing (compile)
-import StateGet exposing (getEvalBodyStepState)
-import StateSet exposing (setEvalBodyStepState)
+import Schelme.Eval exposing (evalBody, evalTerms)
+import Schelme.EvalStep exposing (EvalBodyStep(..), EvalTermsStep(..), NameSpace, SideEffector, SideEffectorStep(..), Term(..))
+import Schelme.Prelude
+import Schelme.Run exposing (compile)
+import Schelme.StateGet exposing (getEvalBodyStepState)
+import Schelme.StateSet exposing (setEvalBodyStepState)
 
 
 {-| a cell is a text-form schelme program,
@@ -115,8 +115,8 @@ type CellStatus id
 -}
 cellme : NameSpace (CellState id cc)
 cellme =
-    Prelude.prelude
-        |> Dict.union Prelude.math
+    Schelme.Prelude.prelude
+        |> Dict.union Schelme.Prelude.math
         |> Dict.insert "cv"
             (TSideEffector (evalArgsPSideEffector cellVal))
 
@@ -130,7 +130,7 @@ compileCells cells =
             cells
 
         compileCell =
-            \cell -> { cell | prog = Run.compile cell.code }
+            \cell -> { cell | prog = Schelme.Run.compile cell.code }
     in
     cellc.map compileCell cells
 
@@ -334,7 +334,7 @@ evalCell : CellContainer id cc -> Cell id (CellState id cc) -> Cell id (CellStat
 evalCell cells cell =
     let
         prog =
-            Run.compile cell.code
+            Schelme.Run.compile cell.code
     in
     case prog of
         Err _ ->
@@ -434,6 +434,9 @@ evalArgsPSideEffector fn =
 
             SideEffectorBody _ _ _ _ ->
                 SideEffectorError "unexpected SideEffectorBody"
+
+            SideEffectorRequest _ _ ->
+                SideEffectorError "unexpected SideEffectorRequest"
 
             SideEffectorFinal _ _ _ ->
                 step

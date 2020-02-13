@@ -15,7 +15,7 @@ import Html.Attributes
 import Markdown.Block exposing (Block(..), Inline, InlineStyle)
 import Markdown.Html
 import Markdown.Parser
-import Show exposing (showTerm, showTerms)
+import Schelme.Show exposing (showTerm, showTerms)
 
 
 type Msg
