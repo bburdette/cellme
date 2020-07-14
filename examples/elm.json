@@ -1,12 +1,11 @@
 {
     "type": "application",
     "source-directories": [
-        "src"
+        "src", "../src"
     ],
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
-            "bburdette/cellme": "1.0.0",
             "bburdette/schelme": "3.0.0",
             "bburdette/toop": "1.0.1",
             "dillonkearns/elm-markdown": "4.0.2",
