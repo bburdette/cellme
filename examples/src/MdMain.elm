@@ -12,10 +12,11 @@ import Element.Input as EI
 import Element.Region
 import Html exposing (Attribute, Html)
 import Html.Attributes
-import Markdown.Block exposing (Block(..), Inline, InlineStyle)
+import Markdown.Block as Block exposing (Block, Inline, ListItem(..), Task(..))
 import Markdown.Html
 import Markdown.Parser
-import Schelme.Show exposing (showTerm, showTerms)
+import Markdown.Renderer
+import Schelme.Show exposing (showTerm)
 
 
 type Msg
@@ -64,12 +65,12 @@ view model =
     }
 
 
-markdownView : Markdown.Parser.Renderer (Element Msg) -> String -> Result String (List (Element Msg))
+markdownView : Markdown.Renderer.Renderer (Element Msg) -> String -> Result String (List (Element Msg))
 markdownView renderer markdown =
     markdown
         |> Markdown.Parser.parse
         |> Result.mapError (\error -> error |> List.map Markdown.Parser.deadEndToString |> String.join "\n")
-        |> Result.andThen (Markdown.Parser.render renderer)
+        |> Result.andThen (Markdown.Renderer.render renderer)
 
 
 mdCells : String -> Result String CellDict
@@ -86,7 +87,7 @@ blockCells blocks =
         |> List.filterMap
             (\block ->
                 case block of
-                    Html tag attribs _ ->
+                    Block.HtmlBlock (Block.HtmlElement tag attribs _) ->
                         if tag == "cell" then
                             let
                                 am =
@@ -97,7 +98,7 @@ blockCells blocks =
                                 |> Maybe.andThen
                                     (\name ->
                                         am
-                                            |> Dict.get "schelmeCode"
+                                            |> Dict.get "schelmecode"
                                             |> Maybe.map (String.replace "/'" "\"")
                                             |> Maybe.andThen
                                                 (\schelme ->
@@ -120,17 +121,17 @@ defCell s =
     { code = s, prog = Err "", runstate = RsErr "" }
 
 
-mkRenderer : CellDict -> Markdown.Parser.Renderer (Element Msg)
+mkRenderer : CellDict -> Markdown.Renderer.Renderer (Element Msg)
 mkRenderer cellDict =
     { heading = heading
-    , raw =
+    , paragraph =
         Element.paragraph
             [ Element.spacing 15 ]
     , thematicBreak = Element.none
-    , plain = Element.text
-    , bold = \content -> Element.row [ Font.bold ] [ Element.text content ]
-    , italic = \content -> Element.row [ Font.italic ] [ Element.text content ]
-    , code = code
+    , text = Element.text
+    , strong = \content -> Element.row [ Font.bold ] content
+    , emphasis = \content -> Element.row [ Font.italic ] content
+    , codeSpan = code
     , link =
         \{ title, destination } body ->
             Element.newTabLink
@@ -142,21 +143,46 @@ mkRenderer cellDict =
                         ]
                         body
                 }
-                |> Ok
+    , hardLineBreak = Html.br [] [] |> Element.html
     , image =
-        \image body ->
-            Element.image [ Element.width Element.fill ] { src = image.src, description = body }
-                |> Ok
+        \image ->
+            case image.title of
+                Just title ->
+                    Element.image [ Element.width Element.fill ] { src = image.src, description = image.alt }
+
+                Nothing ->
+                    Element.image [ Element.width Element.fill ] { src = image.src, description = image.alt }
+    , blockQuote =
+        \children ->
+            Element.column
+                [ EBd.widthEach { top = 0, right = 0, bottom = 0, left = 10 }
+                , Element.padding 10
+                , EBd.color (Element.rgb255 145 145 145)
+                , EBk.color (Element.rgb255 245 245 245)
+                ]
+                children
     , unorderedList =
         \items ->
             Element.column [ Element.spacing 15 ]
                 (items
                     |> List.map
-                        (\itemBlocks ->
+                        (\(ListItem task children) ->
                             Element.row [ Element.spacing 5 ]
                                 [ Element.row
                                     [ Element.alignTop ]
-                                    (Element.text "• " :: itemBlocks)
+                                    ((case task of
+                                        IncompleteTask ->
+                                            EI.defaultCheckbox False
+
+                                        CompletedTask ->
+                                            EI.defaultCheckbox True
+
+                                        NoTask ->
+                                            Element.text "•"
+                                     )
+                                        :: Element.text " "
+                                        :: children
+                                    )
                                 ]
                         )
                 )
@@ -168,7 +194,7 @@ mkRenderer cellDict =
                         (\index itemBlocks ->
                             Element.row [ Element.spacing 5 ]
                                 [ Element.row [ Element.alignTop ]
-                                    (Element.text (String.fromInt index ++ " ") :: itemBlocks)
+                                    (Element.text (String.fromInt (index + startingIndex) ++ " ") :: itemBlocks)
                                 ]
                         )
                 )
@@ -180,9 +206,84 @@ mkRenderer cellDict =
                     cellView cellDict renderedChildren name schelmeCode
                 )
                 |> Markdown.Html.withAttribute "name"
-                |> Markdown.Html.withAttribute "schelmeCode"
+                |> Markdown.Html.withAttribute "schelmecode"
             ]
+    , table = Element.column []
+    , tableHeader = Element.column []
+    , tableBody = Element.column []
+    , tableRow = Element.row []
+    , tableHeaderCell =
+        \maybeAlignment children ->
+            Element.paragraph [] children
+    , tableCell = Element.paragraph []
     }
+
+
+
+{- mkRenderer : CellDict -> Markdown.Renderer.Renderer (Element Msg)
+   mkRenderer cellDict =
+       { heading = heading
+       , raw =
+           Element.paragraph
+               [ Element.spacing 15 ]
+       , thematicBreak = Element.none
+       , plain = Element.text
+       , bold = \content -> Element.row [ Font.bold ] [ Element.text content ]
+       , italic = \content -> Element.row [ Font.italic ] [ Element.text content ]
+       , code = code
+       , link =
+           \{ title, destination } body ->
+               Element.newTabLink
+                   [ Element.htmlAttribute (Html.Attributes.style "display" "inline-flex") ]
+                   { url = destination
+                   , label =
+                       Element.paragraph
+                           [ Font.color (Element.rgb255 0 0 255)
+                           ]
+                           body
+                   }
+                   |> Ok
+       , image =
+           \image body ->
+               Element.image [ Element.width Element.fill ] { src = image.src, description = body }
+                   |> Ok
+       , unorderedList =
+           \items ->
+               Element.column [ Element.spacing 15 ]
+                   (items
+                       |> List.map
+                           (\itemBlocks ->
+                               Element.row [ Element.spacing 5 ]
+                                   [ Element.row
+                                       [ Element.alignTop ]
+                                       (Element.text "• " :: itemBlocks)
+                                   ]
+                           )
+                   )
+       , orderedList =
+           \startingIndex items ->
+               Element.column [ Element.spacing 15 ]
+                   (items
+                       |> List.indexedMap
+                           (\index itemBlocks ->
+                               Element.row [ Element.spacing 5 ]
+                                   [ Element.row [ Element.alignTop ]
+                                       (Element.text (String.fromInt index ++ " ") :: itemBlocks)
+                                   ]
+                           )
+                   )
+       , codeBlock = codeBlock
+       , html =
+           Markdown.Html.oneOf
+               [ Markdown.Html.tag "cell"
+                   (\name schelmeCode renderedChildren ->
+                       cellView cellDict renderedChildren name schelmeCode
+                   )
+                   |> Markdown.Html.withAttribute "name"
+                   |> Markdown.Html.withAttribute "schelmecode"
+               ]
+       }
+-}
 
 
 cellView : CellDict -> List (Element Msg) -> String -> String -> Element Msg
@@ -249,15 +350,15 @@ rawTextToId rawText =
         |> String.replace " " ""
 
 
-heading : { level : Int, rawText : String, children : List (Element msg) } -> Element msg
+heading : { level : Block.HeadingLevel, rawText : String, children : List (Element msg) } -> Element msg
 heading { level, rawText, children } =
     Element.paragraph
         [ Font.size
             (case level of
-                1 ->
+                Block.H1 ->
                     36
 
-                2 ->
+                Block.H2 ->
                     24
 
                 _ ->
@@ -265,10 +366,9 @@ heading { level, rawText, children } =
             )
         , Font.bold
         , Font.family [ Font.typeface "Montserrat" ]
-        , Element.Region.heading level
+        , Element.Region.heading (Block.headingLevelToInt level)
         , Element.htmlAttribute
             (Html.Attributes.attribute "name" (rawTextToId rawText))
-        , Font.center
         , Element.htmlAttribute
             (Html.Attributes.id (rawTextToId rawText))
         ]
